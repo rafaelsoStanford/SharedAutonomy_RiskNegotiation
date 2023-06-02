@@ -56,6 +56,12 @@ VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
 
+# Values copied from car_dynamics.py. Used to differentiate between track or grass. Best solution so far.
+SIZE = 0.02
+FRICTION_LIMIT = (
+    1000000 * SIZE * SIZE
+)
+
 SCALE = 6.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD = 2000 / SCALE  # Game over boundary
@@ -152,6 +158,23 @@ class CarRacing(gym.Env, EzPickle):
     
     def return_absolute_velocity(self):
         return np.linalg.norm(self.car.hull.linearVelocity)
+    
+    def return_track_flag(self):
+        """
+        Verify if a tire is on grass tile
+        Returns: True if on track, False if on grass
+        """
+        grass = True
+        track = False
+        for w in self.car.wheels:
+            for tile in w.tiles:
+                #If there is a tile that is not grass, then the car is not on grass
+                grass = False  
+                track = True
+        # print("GRASS: ", grass)
+        # print("TRACK: ", track)  
+        return track
+    
 
     def _destroy(self):
         if not self.road:
@@ -618,8 +641,6 @@ class CarRacing(gym.Env, EzPickle):
         self.score_label.text = "%04i" % self.reward
         self.score_label.draw()
 
-    def returnVelocityVector(self):
-        return self.car.hull.linearVelocity
 
 
 if __name__ == "__main__":
@@ -666,6 +687,7 @@ if __name__ == "__main__":
         steps = 0
         restart = False
         while True:
+            env.return_track_flag()
             s, r, done, info = env.step(a)
             total_reward += r
             if steps % 200 == 0 or done:

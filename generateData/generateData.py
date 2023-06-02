@@ -1,8 +1,12 @@
 '''
-Using conda environement robodiff 3.9.15 from diffusion policy: https://diffusion-policy.cs.columbia.edu/
-Follow their instructions to install the environment and dependencies
-Copied their implmentation of ReplayBuffer into the Utils folder.
+Using conda environement gym_0.21.0
+Copied  implmentation of ReplayBuffer from diffusion policy  into the Utils folder.
 This ensures that the replay buffer is compatible with their environment when training diffusion in Colab file.
+
+IMPORTANT:  The current environment of car_race is not compatible with gym or gymnasium (which would be version 0.26.0).
+            It is compatible with gym==0.21.0!!! 
+            This is because the car_racing.py file was modified and doing it again for the new version of gym would be a pain.
+            Maybe I will do it in the future, but for now, I will stick with gym==0.21.0
 '''
 
 import os
@@ -76,7 +80,7 @@ def keyboardControl():
 def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
-        img_hist, vel_hist ,act_hist = [], [], []
+        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
         obs = env.reset()
         done = False
 
@@ -88,7 +92,8 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
 
             observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
                 "image": obs,
-                "velocity": env.return_absolute_velocity() # This function was added manually to car racing environment
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
             }
 
             action = calculateAction(observation, TARGET_VELOCITY)
@@ -96,9 +101,9 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
             # Save the observation and action            
             img_hist.append(observation['image'])
             vel_hist.append(observation['velocity'])
+            flag_hist.append(observation['track'])
             act_hist.append(action)
 
-            print("Velocity: ", observation['velocity'])
             # Take the action
             obs, reward, done, info = env.step(action)
         
