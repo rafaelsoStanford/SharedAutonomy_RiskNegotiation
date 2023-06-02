@@ -21,46 +21,7 @@ from utils.car_racing import CarRacing
 from utils.functions import *
 
 
-def action_sinusoidalTrajectory(t, freq, observation, Amplitude, target_velocity):
-    # Observations are the following:
-    image = observation['image']
-    velocity = observation['velocity']
 
-    # Environment constants
-    carPos = np.array([70, 48]) # Position of the car in the image (pixel coordinates)
-    widthOfTrack = 20 # Approx width of the track in pixels
-
-    # Initialize controllers
-    pid_angle = PID(0.5, -0.2, 0.0, setpoint=0)
-    pid_velocity = PID(0.05, 0.1, 0.1, setpoint=target_velocity)
-
-    # Find the next target point of sinusoidal trajectory
-    scale_dist = 10 # This scales the vertical distance of the next target point from tip of car
-    targetPoint, estimatedMiddlePoint, vector_track_normalized, vector_track_perp_normalized = calculateTargetPoint(image, widthOfTrack, freq, scale_dist , Amplitude, t)
-    
-    if targetPoint is None:
-        action = [0,0,0] # If unreasonable values where found for the target point, keep the previous action. This avoids an edge case error
-        return action
-
-    # Calculate the angle to the target point
-    error = targetPoint - carPos
-    carVector = np.array([-1, 0])
-    angle = np.arccos(np.dot(error, carVector) / (np.linalg.norm(error) * np.linalg.norm(carVector)))
-    #Check if the angle is positive or negative -> negative full left turn, positive full right turn        
-    if error[1] > 0:
-        angle = -angle        
-    steeringAngle = pid_angle(angle)
-    # Calculate the acceleration or if negative, the breaking
-    acc = pid_velocity(velocity)
-    breaking = 0
-    if acc < 0:
-        breaking = -acc
-        acc = 0
-    action = [steeringAngle, acc, breaking]
-
-    #print("Actions: ", action)
-    return action
-    
 
 def keyboardControl():
 
