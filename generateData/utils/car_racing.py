@@ -149,6 +149,9 @@ class CarRacing(gym.Env, EzPickle):
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+    
+    def return_absolute_velocity(self):
+        return np.linalg.norm(self.car.hull.linearVelocity)
 
     def _destroy(self):
         if not self.road:
