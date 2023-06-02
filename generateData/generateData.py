@@ -22,7 +22,6 @@ from utils.functions import *
 
 
 def action_sinusoidalTrajectory(t, freq, observation, Amplitude, target_velocity):
-
     # Observations are the following:
     image = observation['image']
     velocity = observation['velocity']
@@ -119,7 +118,6 @@ def keyboardControl():
                 break
     env.close()
 
-
 def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
     
     for episode in range(NUM_EPISODES):
@@ -132,7 +130,7 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
         iter = 0
 
         while not done:
-            env.render(mode = "human")
+            env.render(mode="rgb_array")
 
             observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
                 "image": obs,
@@ -156,8 +154,7 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
             iter += 1
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
-            
-
+        
 def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
@@ -174,7 +171,7 @@ def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
         iter = 0
 
         while not done:
-            env.render(mode = "human")
+            env.render(mode="rgb_array")
 
             observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
                 "image": obs,
@@ -198,9 +195,6 @@ def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
             iter += 1
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
-
-
-
 
 def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
@@ -218,7 +212,7 @@ def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
         iter = 0
 
         while not done:
-            env.render(mode = "human")
+            env.render(mode="rgb_array")
 
             observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
                 "image": obs,
@@ -243,17 +237,16 @@ def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
 
-
 def generateData():
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
-    NUM_EPISODES = 10
+    NUM_EPISODES = 1
     
     # Create the environment
     env = CarRacing()
     env.render(mode="rgb_array")
 
-    #pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
+    pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
     sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES)
     sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES)
 

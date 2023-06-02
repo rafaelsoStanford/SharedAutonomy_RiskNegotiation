@@ -170,7 +170,7 @@ def calculateAction(observation , target_velocity):
     control_dist = pid_distance(error_dist)
     control_vel = pid_velocity(velocity)
 
-    print("Control outputs: ", control_ang, control_dist, control_vel)
+    #print("Control outputs: ", control_ang, control_dist, control_vel)
     acc = control_vel
     breaking = 0
     if acc < 0:
