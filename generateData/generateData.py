@@ -20,6 +20,49 @@ from utils.replay_buffer import ReplayBuffer
 from utils.car_racing import CarRacing
 from utils.functions import *
 
+
+def action_sinusoidalTrajectory(t, freq, observation, Amplitude, target_velocity):
+
+    # Observations are the following:
+    image = observation['image']
+    velocity = observation['velocity']
+
+    # Environment constants
+    carPos = np.array([70, 48]) # Position of the car in the image (pixel coordinates)
+    widthOfTrack = 20 # Approx width of the track in pixels
+
+    # Initialize controllers
+    pid_angle = PID(0.5, -0.2, 0.0, setpoint=0)
+    pid_velocity = PID(0.05, 0.1, 0.1, setpoint=target_velocity)
+
+    # Find the next target point of sinusoidal trajectory
+    scale_dist = 10 # This scales the vertical distance of the next target point from tip of car
+    targetPoint, estimatedMiddlePoint, vector_track_normalized, vector_track_perp_normalized = calculateTargetPoint(image, widthOfTrack, freq, scale_dist , Amplitude, t)
+    
+    if targetPoint is None:
+        action = [0,0,0] # If unreasonable values where found for the target point, keep the previous action. This avoids an edge case error
+        return action
+
+    # Calculate the angle to the target point
+    error = targetPoint - carPos
+    carVector = np.array([-1, 0])
+    angle = np.arccos(np.dot(error, carVector) / (np.linalg.norm(error) * np.linalg.norm(carVector)))
+    #Check if the angle is positive or negative -> negative full left turn, positive full right turn        
+    if error[1] > 0:
+        angle = -angle        
+    steeringAngle = pid_angle(angle)
+    # Calculate the acceleration or if negative, the breaking
+    acc = pid_velocity(velocity)
+    breaking = 0
+    if acc < 0:
+        breaking = -acc
+        acc = 0
+    action = [steeringAngle, acc, breaking]
+
+    #print("Actions: ", action)
+    return action
+    
+
 def keyboardControl():
 
     # This is the code from the car_racing.py file
@@ -78,6 +121,7 @@ def keyboardControl():
 
 
 def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
+    
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
         img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
@@ -115,10 +159,90 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
             
 
 def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
-    pass
+    for episode in range(NUM_EPISODES):
+        print("Episode: ", episode)
+
+        # Parameters for sinusoidal trajectory
+        Amplitude = 5 #Safe (ie within bounds of track); found by trial and error
+        freq = 1/100 
+
+        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
+        obs = env.reset()
+        done = False
+
+        max_iter = 1000
+        iter = 0
+
+        while not done:
+            env.render(mode = "human")
+
+            observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                "image": obs,
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
+            }
+
+            action = action_sinusoidalTrajectory(iter, freq, observation, Amplitude ,TARGET_VELOCITY)
+            
+            # Save the observation and action            
+            img_hist.append(observation['image'])
+            vel_hist.append(observation['velocity'])
+            flag_hist.append(observation['track'])
+            act_hist.append(action)
+
+            # Take the action
+            obs, reward, done, info = env.step(action)
+        
+            if iter == max_iter:
+                done = True
+            iter += 1
+
+        print("Episode finished after {} timesteps".format(len(img_hist)))
+
+
+
 
 def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
-    pass
+    for episode in range(NUM_EPISODES):
+        print("Episode: ", episode)
+
+        # Parameters for sinusoidal trajectory
+        Amplitude = 13 #Safe (ie within bounds of track); found by trial and error
+        freq = 1/100 
+
+        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
+        obs = env.reset()
+        done = False
+
+        max_iter = 1000
+        iter = 0
+
+        while not done:
+            env.render(mode = "human")
+
+            observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                "image": obs,
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
+            }
+
+            action = action_sinusoidalTrajectory(iter, freq, observation, Amplitude ,TARGET_VELOCITY)
+            
+            # Save the observation and action            
+            img_hist.append(observation['image'])
+            vel_hist.append(observation['velocity'])
+            flag_hist.append(observation['track'])
+            act_hist.append(action)
+
+            # Take the action
+            obs, reward, done, info = env.step(action)
+        
+            if iter == max_iter:
+                done = True
+            iter += 1
+
+        print("Episode finished after {} timesteps".format(len(img_hist)))
+
 
 def generateData():
     # Parameters for all three data gathering methods
@@ -129,7 +253,7 @@ def generateData():
     env = CarRacing()
     env.render(mode="rgb_array")
 
-    pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
+    #pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
     sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES)
     sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES)
 

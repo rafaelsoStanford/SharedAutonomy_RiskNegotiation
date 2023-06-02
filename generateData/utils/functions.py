@@ -158,7 +158,6 @@ def calculateAction(observation , target_velocity):
     pid_distance = PID(0.5, -0.005, 0.05, setpoint=0)
     pid_velocity = PID(0.05, -0.1, 0.2, setpoint=target_velocity)
     
-
     # Distinguish observation type
     image = observation['image']
     velocity = observation['velocity']

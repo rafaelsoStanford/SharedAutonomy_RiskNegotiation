@@ -141,6 +141,7 @@ def main():
         carPos = np.array([70, 48]) # Position of the car in the image (pixel coordinates)
         widthOfTrack = 20 # Approx width of the track in pixels
         image = obs.copy()
+        
         # Find the next target point of sinusoidal trajectory
         targetPoint, estimatedMiddlePoint, vector_track_normalized, vector_track_perp_normalized = calculateTargetPoint(image, widthOfTrack, freq, scale_dist, Amplitude, t)
         if targetPoint is None:
