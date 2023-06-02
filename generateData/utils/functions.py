@@ -178,5 +178,5 @@ def calculateAction(observation , target_velocity):
         breaking = -control_vel
     
     # Calculate and return final action
-    action = (control_ang , acc, breaking)
+    action = [control_ang , acc, breaking]
     return action

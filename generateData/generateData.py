@@ -118,11 +118,11 @@ def keyboardControl():
                 break
     env.close()
 
-def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
+def pidDriver(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
     
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
-        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
         obs = env.reset()
         done = False
 
@@ -143,7 +143,7 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
             # Save the observation and action            
             img_hist.append(observation['image'])
             vel_hist.append(observation['velocity'])
-            flag_hist.append(observation['track'])
+            track_hist.append(observation['track'])
             act_hist.append(action)
 
             # Take the action
@@ -153,9 +153,20 @@ def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
                 done = True
             iter += 1
 
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
+
         print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
+
         
-def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
+def sinusoidalDriverSafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
 
@@ -163,7 +174,7 @@ def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
         Amplitude = 5 #Safe (ie within bounds of track); found by trial and error
         freq = 1/100 
 
-        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
         obs = env.reset()
         done = False
 
@@ -184,7 +195,7 @@ def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
             # Save the observation and action            
             img_hist.append(observation['image'])
             vel_hist.append(observation['velocity'])
-            flag_hist.append(observation['track'])
+            track_hist.append(observation['track'])
             act_hist.append(action)
 
             # Take the action
@@ -193,10 +204,21 @@ def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
             if iter == max_iter:
                 done = True
             iter += 1
+        
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
+
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
 
-def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
+def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
 
@@ -204,13 +226,14 @@ def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
         Amplitude = 13 #Safe (ie within bounds of track); found by trial and error
         freq = 1/100 
 
-        img_hist, vel_hist ,act_hist, flag_hist = [], [], [], []
+        #Initialize the buffers
+        buffer = ReplayBuffer.create_empty_numpy()
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
+        
         obs = env.reset()
         done = False
-
         max_iter = 1000
         iter = 0
-
         while not done:
             env.render(mode="rgb_array")
 
@@ -225,7 +248,7 @@ def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
             # Save the observation and action            
             img_hist.append(observation['image'])
             vel_hist.append(observation['velocity'])
-            flag_hist.append(observation['track'])
+            track_hist.append(observation['track'])
             act_hist.append(action)
 
             # Take the action
@@ -234,21 +257,52 @@ def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
             if iter == max_iter:
                 done = True
             iter += 1
+        
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
 
 def generateData():
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
     NUM_EPISODES = 1
+    CHUNK_LEN = -1
+
+    #Path to save data
+    path = "./data/multipleDrivingBehaviours.zarr"
     
-    # Create the environment
+    # Init environment and buffer
     env = CarRacing()
     env.render(mode="rgb_array")
+    buffer = ReplayBuffer.create_empty_numpy()
 
-    pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
-    sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES)
-    sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES)
+    # Run the data gathering methods and save in history lists
+    pidDriver(env, buffer,TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverSafe(env , buffer, TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES)
+
+    print("Saving data to path: ", path)
+    buffer.save_to_path(path, chunk_length=CHUNK_LEN)
+
+    # Consolidate metadata and zip the file
+    store = zarr.DirectoryStore(path)
+    data = zarr.group(store=store)
+    print(data.tree(expand=True))
+    zarr_file = os.path.basename(path)
+    zip_file = zarr_file + ".zip"
+    zarr.consolidate_metadata(store)
+    shutil.make_archive(path, "zip", path)
+    print(f"Zarr file saved as {zip_file}")
+    
+
 
 if __name__ == "__main__":
     ''' USAGE: 
