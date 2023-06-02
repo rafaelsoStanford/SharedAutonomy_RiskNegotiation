@@ -1,8 +1,12 @@
 '''
-Using conda environement robodiff 3.9.15 from diffusion policy: https://diffusion-policy.cs.columbia.edu/
-Follow their instructions to install the environment and dependencies
-Copied their implmentation of ReplayBuffer into the Utils folder.
+Using conda environement gym_0.21.0
+Copied  implmentation of ReplayBuffer from diffusion policy  into the Utils folder.
 This ensures that the replay buffer is compatible with their environment when training diffusion in Colab file.
+
+IMPORTANT:  The current environment of car_race is not compatible with gym or gymnasium (which would be version 0.26.0).
+            It is compatible with gym==0.21.0!!! 
+            This is because the car_racing.py file was modified and doing it again for the new version of gym would be a pain.
+            Maybe I will do it in the future, but for now, I will stick with gym==0.21.0
 '''
 
 import os
@@ -10,9 +14,13 @@ import shutil
 import zarr
 import numpy as np
 
+import time
+
 from utils.replay_buffer import ReplayBuffer
 from utils.car_racing import CarRacing
 from utils.functions import *
+
+
 
 
 def keyboardControl():
@@ -71,56 +79,191 @@ def keyboardControl():
                 break
     env.close()
 
-
-def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
-    buffer = ReplayBuffer.create_empty_numpy()
+def pidDriver(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
+    
     for episode in range(NUM_EPISODES):
         print("Episode: ", episode)
-        obs_hist, act_hist = [], []
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
         obs = env.reset()
         done = False
 
-        max_iter = 100
+        max_iter = 1000
         iter = 0
 
         while not done:
-            env.render(mode = "rgb_array")
-            action = env.action_space.sample()
+            env.render(mode="rgb_array")
+
+            observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                "image": obs,
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
+            }
+
+            action = calculateAction(observation, TARGET_VELOCITY)
             
             # Save the observation and action            
-            obs_hist.append(obs)
+            img_hist.append(observation['image'])
+            vel_hist.append(observation['velocity'])
+            track_hist.append(observation['track'])
             act_hist.append(action)
 
             # Take the action
             obs, reward, done, info = env.step(action)
-            
+        
             if iter == max_iter:
                 done = True
             iter += 1
 
-        print("Episode finished after {} timesteps".format(len(obs_hist)))
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
+
+        print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
+
+        
+def sinusoidalDriverSafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
+    for episode in range(NUM_EPISODES):
+        print("Episode: ", episode)
+
+        # Parameters for sinusoidal trajectory
+        Amplitude = 5 #Safe (ie within bounds of track); found by trial and error
+        freq = 1/100 
+
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
+        obs = env.reset()
+        done = False
+
+        max_iter = 1000
+        iter = 0
+
+        while not done:
+            env.render(mode="rgb_array")
+
+            observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                "image": obs,
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
+            }
+
+            action = action_sinusoidalTrajectory(iter, freq, observation, Amplitude ,TARGET_VELOCITY)
             
+            # Save the observation and action            
+            img_hist.append(observation['image'])
+            vel_hist.append(observation['velocity'])
+            track_hist.append(observation['track'])
+            act_hist.append(action)
+
+            # Take the action
+            obs, reward, done, info = env.step(action)
+        
+            if iter == max_iter:
+                done = True
+            iter += 1
+        
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
 
 
-def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
-    pass
+        print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
 
-def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
-    pass
+def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
+    for episode in range(NUM_EPISODES):
+        print("Episode: ", episode)
+
+        # Parameters for sinusoidal trajectory
+        Amplitude = 13 #Safe (ie within bounds of track); found by trial and error
+        freq = 1/100 
+
+        #Initialize the buffers
+        buffer = ReplayBuffer.create_empty_numpy()
+        img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
+        
+        obs = env.reset()
+        done = False
+        max_iter = 1000
+        iter = 0
+        while not done:
+            env.render(mode="rgb_array")
+
+            observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                "image": obs,
+                "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
+                "track": env.return_track_flag()
+            }
+
+            action = action_sinusoidalTrajectory(iter, freq, observation, Amplitude ,TARGET_VELOCITY)
+            
+            # Save the observation and action            
+            img_hist.append(observation['image'])
+            vel_hist.append(observation['velocity'])
+            track_hist.append(observation['track'])
+            act_hist.append(action)
+
+            # Take the action
+            obs, reward, done, info = env.step(action)
+        
+            if iter == max_iter:
+                done = True
+            iter += 1
+        
+        img_hist = np.array(img_hist, dtype=np.float32)
+        act_hist = np.array(act_hist, dtype=np.float32)
+        vel_hist = np.array(vel_hist, dtype=np.float32)
+        track_hist = np.array(track_hist, dtype=np.float32)
+
+        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        buffer.add_episode(episode_data)
+
+        print("Episode finished after {} timesteps".format(len(img_hist)))
+        env.close()
+        return img_hist, vel_hist ,act_hist, track_hist
 
 def generateData():
-
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
-    NUM_EPISODES = 10
+    NUM_EPISODES = 1
+    CHUNK_LEN = -1
+
+    #Path to save data
+    path = "./data/multipleDrivingBehaviours.zarr"
     
-    # Create the environment
+    # Init environment and buffer
     env = CarRacing()
     env.render(mode="rgb_array")
+    buffer = ReplayBuffer.create_empty_numpy()
 
-    pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
-    sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES)
-    sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES)
+    # Run the data gathering methods and save in history lists
+    pidDriver(env, buffer,TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverSafe(env , buffer, TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES)
+
+    print("Saving data to path: ", path)
+    buffer.save_to_path(path, chunk_length=CHUNK_LEN)
+
+    # Consolidate metadata and zip the file
+    store = zarr.DirectoryStore(path)
+    data = zarr.group(store=store)
+    print(data.tree(expand=True))
+    zarr_file = os.path.basename(path)
+    zip_file = zarr_file + ".zip"
+    zarr.consolidate_metadata(store)
+    shutil.make_archive(path, "zip", path)
+    print(f"Zarr file saved as {zip_file}")
+    
+
 
 if __name__ == "__main__":
     ''' USAGE: 

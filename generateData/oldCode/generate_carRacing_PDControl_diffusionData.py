@@ -149,6 +149,9 @@ class CarRacing(gym.Env, EzPickle):
 
     def return_velocity(self):
         return self.car.hull.linearVelocity
+    
+    def return_absolute_velocity(self):
+        return np.linalg.norm(self.car.hull.linearVelocity)
 
     def bool_onGrass(self):
         """
