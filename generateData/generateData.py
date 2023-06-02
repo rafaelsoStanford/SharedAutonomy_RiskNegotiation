@@ -9,11 +9,15 @@ import os
 import shutil
 import zarr
 import numpy as np
+
 from utils.replay_buffer import ReplayBuffer
 from utils.car_racing import CarRacing
+from utils.functions import *
 
 
 def keyboardControl():
+
+    # This is the code from the car_racing.py file
     from pyglet.window import key
     a = np.array([0.0, 0.0, 0.0])
     val = 1.0
@@ -67,16 +71,70 @@ def keyboardControl():
                 break
     env.close()
 
+
+def pidDriver(env, TARGET_VELOCITY, NUM_EPISODES):
+    buffer = ReplayBuffer.create_empty_numpy()
+    for episode in range(NUM_EPISODES):
+        print("Episode: ", episode)
+        obs_hist, act_hist = [], []
+        obs = env.reset()
+        done = False
+
+        max_iter = 100
+        iter = 0
+
+        while not done:
+            env.render(mode = "rgb_array")
+            action = env.action_space.sample()
+            
+            # Save the observation and action            
+            obs_hist.append(obs)
+            act_hist.append(action)
+
+            # Take the action
+            obs, reward, done, info = env.step(action)
+            
+            if iter == max_iter:
+                done = True
+            iter += 1
+
+        print("Episode finished after {} timesteps".format(len(obs_hist)))
+            
+
+
+def sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES):
+    pass
+
+def sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES):
+    pass
+
+def generateData():
+
+    # Parameters for all three data gathering methods
+    TARGET_VELOCITY = 30
+    NUM_EPISODES = 10
+    
+    # Create the environment
+    env = CarRacing()
+    env.render(mode="rgb_array")
+
+    pidDriver(env, TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverSafe(env, TARGET_VELOCITY, NUM_EPISODES)
+    sinusoidalDriverUnsafe(env, TARGET_VELOCITY, NUM_EPISODES)
+
 if __name__ == "__main__":
     ''' USAGE: 
         adjust method_id to select the method of data generation
 
-            default: Allows for keyboard control of the car. No data is saved. Meant as a way to test the environment.
-            
+            default:        Allows for keyboard control of the car. No data is saved. Meant as a way to test the environment.
+            generateData:   Generates three types of data: PD-Driver, Sinusoidal-Driver(safe) and Sinusoidal-Driver(unsafe). 
+                            Saves data to the specified directory.
     '''
-    method_id = "default"
+
+    method_id = "generateData"
     switch_dict = {
-        "default": keyboardControl
+        "default": keyboardControl,
+        "generateData": generateData
     }
 
     # Call the appropriate function based on method_id
