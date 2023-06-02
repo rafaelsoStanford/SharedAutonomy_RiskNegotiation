@@ -41,5 +41,6 @@ The `generateData()` function is responsible for generating the data. It perform
 - Make sure to set up the CarRacing environment and install the necessary libraries before running this script.
 - The script utilizes the zarr library for data storage and manipulation.
 - The generated data can be used for training and evaluating driving behavior models.
+- We save gathered data in a single .zarr folder, which then is compressed as a `.zip` file. The diffusion notebook is set up to load the compressed files.
 
 For more details, refer to the code comments and the script itself.
