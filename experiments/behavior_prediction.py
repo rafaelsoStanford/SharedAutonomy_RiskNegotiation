@@ -13,8 +13,8 @@ from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
 
-from models.modules.UNet import *
-from models.modules.getResnet import *
+from modules.UNet import *
+from modules.getResnet import *
 
 
 # 1. Load the model
