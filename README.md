@@ -1,7 +1,7 @@
 ### WORK IN PROGRESS ###
 
 
-# SharedAutonomy_RiskNegotiation
+# Leveraging Human Intent for Shared Autonomy and Risk Negotiation
 
 Shared autonomy for transitions from AI to human control of a vehicle. Design of an agent capable identifying human driver behavior and safely transitioning vehicle control.
 
@@ -19,7 +19,7 @@ This is a three-stage project:
 
 - **Diffusion Model Training**: The repository also includes a data generation script that can be used to train diffusion models. These models can be used to model and predict the behavior of human drivers in distinct scenarios.
 -> Currently uses a Google Colab implementation which is based on the code of the following work: [Diffusion Policy
-Visuomotor Policy Learning via Action Diffusion] https://github.com/columbia-ai-robotics/diffusion_policy 
+Visuomotor Policy Learning via Action Diffusion](https://github.com/columbia-ai-robotics/diffusion_policy)
 
 
 
