@@ -119,12 +119,17 @@ def pidDriver(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
         vel_hist = np.array(vel_hist, dtype=np.float32)
         track_hist = np.array(track_hist, dtype=np.float32)
 
-        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        episode_data = {"img": img_hist, 
+                        "velocity": vel_hist[:, None], 
+                        "track": track_hist[:, None],
+                        "action": act_hist, 
+                        "h_action": act_hist #This will act as a placeholder for "human action". It is crude, but works for current testing purposes
+                        }
         buffer.add_episode(episode_data)
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
         env.close()
-        return img_hist, vel_hist ,act_hist, track_hist
+    return img_hist, vel_hist ,act_hist, track_hist
 
         
 def sinusoidalDriverSafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
@@ -171,13 +176,17 @@ def sinusoidalDriverSafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
         vel_hist = np.array(vel_hist, dtype=np.float32)
         track_hist = np.array(track_hist, dtype=np.float32)
 
-        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        episode_data = {"img": img_hist, 
+                "velocity": vel_hist[:, None], 
+                "track": track_hist[:, None],
+                "action": act_hist, 
+                "h_action": act_hist #This will act as a placeholder for "human action". It is crude, but works for current testing purposes
+                }
         buffer.add_episode(episode_data)
-
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
         env.close()
-        return img_hist, vel_hist ,act_hist, track_hist
+    return img_hist, vel_hist ,act_hist, track_hist
 
 def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
     for episode in range(NUM_EPISODES):
@@ -188,7 +197,6 @@ def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
         freq = 1/100 
 
         #Initialize the buffers
-        buffer = ReplayBuffer.create_empty_numpy()
         img_hist, vel_hist ,act_hist, track_hist = [], [], [], []
         
         obs = env.reset()
@@ -224,12 +232,17 @@ def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
         vel_hist = np.array(vel_hist, dtype=np.float32)
         track_hist = np.array(track_hist, dtype=np.float32)
 
-        episode_data = {"img": img_hist, "action": act_hist, "velocity": vel_hist[:, None], "on_track": track_hist[:, None]}
+        episode_data = {"img": img_hist, 
+                "velocity": vel_hist[:, None], 
+                "track": track_hist[:, None],
+                "action": act_hist, 
+                "h_action": act_hist #This will act as a placeholder for "human action". It is crude, but works for current testing purposes
+                }
         buffer.add_episode(episode_data)
 
         print("Episode finished after {} timesteps".format(len(img_hist)))
         env.close()
-        return img_hist, vel_hist ,act_hist, track_hist
+    return img_hist, vel_hist ,act_hist, track_hist
 
 def generateData():
     # Parameters for all three data gathering methods
