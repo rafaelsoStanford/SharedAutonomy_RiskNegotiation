@@ -2,7 +2,8 @@
 from modules.UNet import *
 from modules.getResnet import *
 
-def CreateDenoisingNet(pred_horizon, obs_horizon, action_horizon, vision_feature_dim, lowdim_obs_dim, obs_dim, action_dim, num_diffusion_iters=100):
+def CreateDenoisingNet(pred_horizon, obs_horizon, action_horizon, vision_feature_dim, lowdim_obs_dim, 
+                       obs_dim, action_dim, num_diffusion_iters, device):
     #Set up model for evaluation
     #@markdown ### **Network Demo**
 
@@ -69,9 +70,6 @@ def CreateDenoisingNet(pred_horizon, obs_horizon, action_horizon, vision_feature
         # our network predicts noise (instead of denoised action)
         prediction_type='epsilon'
     )
-
-    # device transfer
-    device = torch.device('cuda')
     _ = nets.to(device)
 
     return nets
