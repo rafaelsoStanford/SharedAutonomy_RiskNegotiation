@@ -25,3 +25,6 @@ Visuomotor Policy Learning via Action Diffusion] https://github.com/columbia-ai-
 
 - **Data Generation**: In the corresponding folder you will find data generation script which is based on the CarRacing environment by OpenAi Gym. It uses a slightly modified version of `car_racing.py`in order to account for the desired observations. The data is saved using a .zarr structure and consequently as a.zip file, such that it is compatible with the implementation in Google Colab.
 - **Diffusion (Colab)**: 
+The Colab implementation is based on the image colab repository made by [Diffusion Policy
+Visuomotor Policy Learning via Action Diffusion] https://github.com/columbia-ai-robotics/diffusion_policy . We replaced the environment to use the CarDriving-v2 from OpenAi **Gymnasium** (which is equivalent to my knowledge to gym==0.26.0). Since Colab switched to Python version 3.10.x the gym==0.21.0 is no longer compatible. Thus we modified the CarRacing environment of Gymnasium. Thus note that there are syntax differences between how `env.` functions are used, compared to our data generation files. 
+The environment inputs and outputs have stayed the same, thus the data can still be used. 
