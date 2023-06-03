@@ -1,7 +1,7 @@
 
 import numpy as np
 import cv2
-from utils.controller import Controller # Original controller implementation by Rafael Sonderegger, opted using simplePid library instead
+#from utils.controller import Controller # Original controller implementation by Rafael Sonderegger, opted using simplePid library instead
 from simple_pid import PID # Simple PID library by Brett Beauregard
 
 def findEdges(image):
