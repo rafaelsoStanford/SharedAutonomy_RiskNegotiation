@@ -6,9 +6,9 @@
 Shared autonomy for transitions from AI to human control of a vehicle. Design of an agent capable identifying human driver behavior and safely transitioning vehicle control.
 
 This is a three-stage project: 
-    - Classification of human driver behavior.
-    - Given driving behavior, we classify if future trajectory is safe/unsafe
-    - Finally begin shared control strategy, slowly handing over vehicle control to driver
+- Trajectory prediction conditioned on human driver behavior.
+- Classification of future trajectory as safe/unsafe.
+- Finally if safe begin shared control strategy, slowly handing over vehicle control to driver.
 
 ## Features
 - **Behavior Identification**: The agent is equipped with a diffusion policy model trained on various human driver behaviors, allowing it to make trajectory predictions conditioned on past state observations and driver inputs.
@@ -37,4 +37,11 @@ Visuomotor Policy Learning via Action Diffusion] https://github.com/columbia-ai-
 The Colab implementation is based on the image colab repository made by [Diffusion Policy
 Visuomotor Policy Learning via Action Diffusion] https://github.com/columbia-ai-robotics/diffusion_policy . We replaced the environment to use the CarDriving-v2 from OpenAi **Gymnasium** (which is equivalent to my knowledge to gym==0.26.0). Since Colab switched to Python version 3.10.x the gym==0.21.0 is no longer compatible. Thus we modified the CarRacing environment of Gymnasium. Thus note that there are syntax differences between how `env.` functions are used, compared to our data generation files. 
 The environment inputs and outputs have stayed the same, thus the data can still be used. 
--**Experiments**: 
+- **Experiments**: 
+Includes an framework of setting up a controlled Car-Racing environment in gym==0.21.0. This includes:
+- [ ] Automated multiple track generation
+- [x] Fixed track seeds for reproducability
+- [ ] Random controller choice
+- [ ] Fixing seed for controller choice
+- [x] Move starting line
+- [x] Avoid zoom
