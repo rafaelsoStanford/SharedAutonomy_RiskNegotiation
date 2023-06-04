@@ -20,14 +20,14 @@ The code will perform two experimental runs: one with diffusion policy predictio
 
 ## Important Functions
 
-# Environment related functions / Agent related
+**Environment related functions / Agent related
 - `calculateAction`: This function calculates the action using a PD controller to move away from the starting position based on the current observation and target velocity.
 
 - `action_sinusoidalTrajectory`: This function generates actions using a sinusoidal trajectory controller for the controller policy prediction experiment based on the current number of steps, frequency, observation, duration, and target velocity.
 
 - `gatherConditionalActions`: This function gathers the conditional actions (image history, velocity history, and historical actions) for the diffusion prediction experiment based on the specified observation horizon and start iteration.
 
-# Diffusion policy related functions (See colab implementation)
+**Diffusion policy related functions (See colab implementation)
 
 - `CreateDenoisingNet`: This function sets up the denoising network model with the specified parameters for the prediction horizon, observation horizon, action horizon, and dimensions of the observation and action spaces.
 
