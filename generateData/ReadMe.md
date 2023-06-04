@@ -37,7 +37,7 @@ The `generateData()` function is responsible for generating the data. It perform
 3. Saves the collected data to the specified path in the zarr file format.
 4. Consolidates the metadata and zips the file.
 
-![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SafeDriver.gif)  ![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SlalomDriverSafe.gif)  ![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SlalomDriverUnsafe.gif)
+            ![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SafeDriver.gif)             ![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SlalomDriverSafe.gif)           ![](https://github.com/rafaelsoStanford/SharedAutonomy_RiskNegotiation/blob/AddGifs/files/SlalomDriverUnsafe.gif)
 
 ## Notes
 - Make sure to set up the CarRacing environment and install the necessary libraries before running this script.
