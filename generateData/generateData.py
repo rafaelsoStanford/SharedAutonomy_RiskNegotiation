@@ -21,8 +21,6 @@ from utils.car_racing import CarRacing
 from utils.functions import *
 
 
-
-
 def keyboardControl():
 
     # This is the code from the car_racing.py file
@@ -247,7 +245,7 @@ def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
 def generateData():
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
-    NUM_EPISODES = 30
+    NUM_EPISODES = 10
     CHUNK_LEN = -1
 
     #Path to save data
