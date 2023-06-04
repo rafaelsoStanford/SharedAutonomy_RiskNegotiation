@@ -234,3 +234,8 @@ def get_data_stats(data):
         'max': np.max(data, axis=0)
     }
     return stats
+
+def unnormalize_data(ndata, stats):
+    ndata = (ndata + 1) / 2
+    data = ndata * (stats['max'] - stats['min']) + stats['min']
+    return data

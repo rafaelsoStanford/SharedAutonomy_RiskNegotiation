@@ -1,78 +1,90 @@
-import os
-import shutil
 import numpy as np
-
 import time
-
 import torch
 
 from utils.car_racing import CarRacing
 from utils.functions import *
-
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
-
 from modules.denoisingNet import *
+import pickle
 
 
-# 1. Load the model
-model = torch.load('experiments/models/Model_DifferentDriverBehaviors.pt')
+# 1. Set up the environment and parameters
+model = torch.load('experiments/models/DifferentDrivingBehaviors.pt')
 
-# 2. Set up an environment
 env = CarRacing()
 env.render()
 
-# Parameters
 pred_horizon = 8    # Number of steps we predict into the future
 obs_horizon = 3     # Number of steps we condition on
 action_horizon = 2
 
-# ResNet18 has output dim of 512
-vision_feature_dim = 512
-# Car Velocity is 1 dimensional
-lowdim_obs_dim = 1 + 3
-# observation feature has 514 dims in total per step
-obs_dim = vision_feature_dim + lowdim_obs_dim
-# Action space is 3 dimensional
-action_dim = 3 + 1
+vision_feature_dim = 512    # ResNet18 has output dim of 512
+lowdim_obs_dim = 1 + 3      # Car Velocity is 1 dimensional
+obs_dim = vision_feature_dim + lowdim_obs_dim    # observation feature has 514 dims in total per step
+action_dim = 3 + 1         # Action space is 3 dimensional + 1 for track_flag
 
+num_diffusion_iters = 100   # Number of diffusion iterations
 
 device = torch.device('cuda')
-ema_net = CreateDenoisingNet(pred_horizon, obs_horizon, action_horizon,
-                             vision_feature_dim, lowdim_obs_dim, obs_dim, action_dim,
-                             num_diffusion_iters=100, device=device)
-ema_net.load_state_dict(model)
-#state_dict = torch.load(ckpt_path, map_location='cuda')
+ema_net = CreateDenoisingNet(
+    pred_horizon,
+    obs_horizon,
+    action_horizon,
+    vision_feature_dim,
+    lowdim_obs_dim,
+    obs_dim,
+    action_dim,
+    num_diffusion_iters,
+    device=device
+)
 
+noise_scheduler = DDPMScheduler(
+    num_train_timesteps=num_diffusion_iters,
+    beta_schedule='squaredcos_cap_v2',    # the choice of beta schedule has a big impact on performance
+    clip_sample=True,    # clip output to [-1,1] to improve stability
+    prediction_type='epsilon'    # our network predicts noise (instead of denoised action)
+)
+
+ema_net.load_state_dict(model)
 
 print('Pretrained weights loaded.')
 
+# 2. Load pickle file with stats from dataset model was trained on
+with open('experiments/file.pkl', 'rb') as f:
+    stats = pickle.load(f)
 
-# 3. Experimental Parameters:
-target_velocity = 20 # Target velocity of the car
-env.seed(7000) # Set a seed for fixed starting conditions (same environment)
-start_iter = 300 # We shall move away from the starting position for 300 steps using PD controller
+# 3. Experimental Parameters
+target_velocity = 20    # Target velocity of the car
+env.seed(7000)    # Set a seed for fixed starting conditions (same environment)
+start_iter = 300    # We shall move away from the starting position for 300 steps using PD controller
 isopen = True
 
-while isopen:
-    start = time.time()
-    total_reward = 0.0
-    steps = 0
-    restart = False
-    obs = env.reset()
-    while True:
+# Experimental runs
+# We want to do two experimental runs: One with diffusion prediction / one with "human" inputs
+diffusion_output = {}
+controller_output = {}
 
-        if time.time() - start < 1:
+for run in range(2):
+    obs = env.reset() # Reset the environment for both passes
+    done = False
+    steps = 0
+    img_hist, vel_hist, haction_hist = [], [], [] # Initialize history
+    start = time.time()
+    while not done:
+        if time.time() - start < 1: 
             print("Waiting for zoom to end")
             a = np.array([0.0, 0.0, 0.0])
             s, r, done, info = env.step(a) # Step has to be called for the environment to move forward
             continue
 
-        observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+        #  Set up an observation dictionary
+        observation = { 
             "image": obs,
-            "velocity": env.return_absolute_velocity(), # This function was added manually to car racing environment
-            "track": env.return_track_flag()
+            "velocity": env.return_absolute_velocity(),     # This function was added manually to car racing environment
+            "track": env.return_track_flag()                # This function was added manually to car racing environment
         }
 
         if steps < start_iter:
@@ -81,34 +93,48 @@ while isopen:
             obs, r, done, info = env.step(a)
             steps += 1
             continue
+        
+        # Reached Starting position
+        if run == 0:
+            ''' EXPERIMENT 1: Diffusion Policy Prediction:
+                We gather T_obs steps of history and predict the next T_pred steps.
 
-        # Condition on the obs_horizon steps
-        img_hist, vel_hist, haction_hist = [], [], [] # Initialize history
-        for i in range(obs_horizon):
-            # We move using the PD controller
-            a = calculateAction(observation, target_velocity)
-            # We calculate the "human" policy ie sinonoidal trajectory
-            h_action = action_sinusoidalTrajectory(i+start_iter, 1/100, observation, 12, target_velocity) #Unsafe driver
-            obs, r, done, info = env.step(a)
+                Output: Action sequence of length T_pred
+                        Track flag sequence of length T_pred
+            '''
+            # Condition on the obs_horizon steps
+            for i in range(obs_horizon):
+                # We move using the PD controller
+                a = calculateAction(observation, target_velocity)
+                # We calculate the "human" policy ie sinonoidal trajectory
+                h_action = action_sinusoidalTrajectory(i+start_iter, 1/100, observation, 12 , target_velocity) #Unsafe driver
+                obs, r, done, info = env.step(a)
 
-            # We store the history
-            img_hist.append(observation["image"])
-            vel_hist.append(observation["velocity"])
-            haction_hist.append(h_action)
+                observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation
+                    "image": obs,
+                    "velocity": env.return_absolute_velocity(),     # This function was added manually to car racing environment
+                    "track": env.return_track_flag()                # This function was added manually to car racing environment
+                }
+                # We store the history
+                img_hist.append(observation["image"])
+                vel_hist.append(observation["velocity"])
+                haction_hist.append(h_action)
 
-            # Prediction using model up to prediction horizon
+            img_hist = np.array(img_hist, dtype=np.float32)
+            vel_hist = np.array(vel_hist, dtype=np.float32)
+            vel_hist = vel_hist[:,None]
+            haction_hist = np.array(haction_hist, dtype=np.float32)
 
-############################################ 
             # stack the last obs_horizon number of observations
             images = np.stack(img_hist)
             images = np.moveaxis(images, -1,1) # normalize
             velocity =  np.stack(vel_hist)
             h_action = np.stack(haction_hist)
             # normalize observation
-            stats = get_data_stats(velocity)
-            nvelocity = normalize_data(velocity,stats)
-            stats = get_data_stats(h_action)
-            nh_action = normalize_data(velocity, stats=stats)
+            #stats = get_data_stats(velocity)
+            nvelocity = normalize_data(velocity,stats = stats['velocity'])
+            #stats = get_data_stats(h_action)
+            nh_action = normalize_data(velocity, stats=stats['h_action'])
             # images are already normalized to [0,1]
             nimages = images
 
@@ -116,9 +142,7 @@ while isopen:
             nimages = torch.from_numpy(nimages).to(device, dtype=torch.float32)
             # (2,3,96,96)
             nvelocity = torch.from_numpy(nvelocity).to(device, dtype=torch.float32)
-            nvelocity = nvelocity.unsqueeze(-1)
             nh_action = torch.from_numpy(nh_action).to(device, dtype=torch.float32)
-            nh_action = nh_action.unsqueeze(-1)
 
             # infer action
             with torch.no_grad():
@@ -134,7 +158,6 @@ while isopen:
                 noisy_action = torch.randn(
                     (1, pred_horizon, action_dim), device=device)
                 naction = noisy_action
-
                 # init scheduler
                 noise_scheduler.set_timesteps(num_diffusion_iters)
 
@@ -154,20 +177,54 @@ while isopen:
                     ).prev_sample
 
             # unnormalize action
-            naction = naction.detach().to('cpu').numpy()
+            noutput = naction.detach().to('cpu').numpy()
             # (B, pred_horizon, action_dim)
-            naction = naction[0]
+            noutput = noutput[0] # Since batch size is 1
+
+            #Split actions (dim 3) and track (dim 1):
+            naction = noutput[:, 0:3]
+            ntrack = noutput[:,-1]
+
             action_pred = unnormalize_data(naction, stats=stats['action'])
+            track_pred = unnormalize_data(ntrack, stats=stats['track'])
 
-            # only take action_horizon number of actions
-            start = obs_horizon - 1
-            end = start + action_horizon
-            action = action_pred[start:end,:]
+            print("Action: ", action_pred)
+            print("Track: ", track_pred)
 
-####################
+            diffusion_output['actions'] = action_pred # dim (T_pred, 3)
+            diffusion_output['track'] = track_pred # dim (T_pred, 1)
 
-        steps += 1
-        isopen = env.render()
-        if done or restart or isopen == False:
-            break
-env.close()
+            done = True
+
+        if run == 1:
+            ''' EXPERIMENT 2: Controller Policy Prediction:
+                We gather T_pred steps that would actually be done by "human"
+
+                Output: Action sequence of length T_pred
+                        Track flag sequence of length T_pred
+            '''
+            a_hist, t_hist = [] , []
+            for _ in range(pred_horizon):
+                # EXPERIMENT 2: "Human" (ie controller) inputs
+                # We move using the "human" policy
+                a = action_sinusoidalTrajectory(steps, 1/100, observation, 12 , target_velocity) #Unsafe driver
+                obs, r, done, info = env.step(a)
+                steps += 1
+
+                observation = { #In order to be more consistent, we will group state variables used for training in a dictionary called observation 
+                    "image": obs,
+                    "velocity": env.return_absolute_velocity(),     # This function was added manually to car racing environment
+                    "track": env.return_track_flag()                # This function was added manually to car racing environment
+                }
+                # We store the history
+                a_hist.append(a)
+                t_hist.append(observation["track"])
+
+            controller_output['actions'] = a_hist # dim (T_pred, 3)
+            controller_output['track'] = t_hist # dim (T_pred, 1)
+
+            done = True
+
+
+print("Diffusion Output: ", diffusion_output['actions'])
+print("Controller Output: ", controller_output['actions'])
