@@ -247,7 +247,7 @@ def sinusoidalDriverUnsafe(env, buffer, TARGET_VELOCITY, NUM_EPISODES):
 def generateData():
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
-    NUM_EPISODES = 1
+    NUM_EPISODES = 30
     CHUNK_LEN = -1
 
     #Path to save data
