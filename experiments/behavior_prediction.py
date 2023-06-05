@@ -11,6 +11,8 @@ from diffusers.optimization import get_scheduler
 from modules.denoisingNet import *
 import pickle
 
+import matplotlib.pyplot as plt
+
 
 
 # 1. Set up the environment and parameters
@@ -165,3 +167,40 @@ print("Controller Output: ", controller_output['actions'])
 
 print("Diffusion Output: ", diffusion_output['track'].astype(int))
 print("Controller Output: ", controller_output['track'])
+
+# 4. Plotting
+# We plot the track flag and the actions along T_pred steps
+plt.figure(figsize=(10, 5))
+plt.subplot(1, 4, 1)
+plt.plot(diffusion_output['track'].astype(int), label='Diffusion')
+plt.plot(controller_output['track'], label='Controller')
+plt.xlabel('Time Steps')
+plt.ylabel('Track Flag')
+plt.legend()
+
+# Change all elements of controller to array elements to match diffusion
+controller_output['actions'] = np.array(controller_output['actions'])
+
+plt.subplot(1, 4, 2)
+plt.plot(diffusion_output['actions'][:, 0], label='Diffusion')
+plt.plot(controller_output['actions'][:, 0], label='Controller')
+plt.xlabel('Time Steps')
+plt.ylabel('Steering')
+
+plt.subplot(1, 4, 3)
+plt.plot(diffusion_output['actions'][:, 1], label='Diffusion')
+plt.plot(controller_output['actions'][:, 1], label='Controller')
+plt.xlabel('Time Steps')
+plt.ylabel('Acceleration')
+
+plt.subplot(1, 4, 4)
+plt.plot(diffusion_output['actions'][:, 2], label='Diffusion')
+plt.plot(controller_output['actions'][:, 2], label='Controller')
+plt.xlabel('Time Steps')
+plt.ylabel('Brake')
+
+plt.legend()
+plt.show()
+
+
+
