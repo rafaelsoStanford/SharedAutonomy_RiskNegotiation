@@ -45,6 +45,7 @@ from gym.envs.box2d.car_dynamics import Car
 from gym.utils import seeding, EzPickle
 
 import pyglet
+from pyglet.gl import *
 
 pyglet.options["debug_gl"] = False
 from pyglet import gl
@@ -64,6 +65,7 @@ FRICTION_LIMIT = (
 
 SCALE = 6.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
+TRACK_RAD2 = 600 / SCALE  # Second track parallel to first track
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
 ZOOM = 2.7  # Camera zoom
@@ -138,7 +140,14 @@ class CarRacing(gym.Env, EzPickle):
         self.reward = 0.0
         self.prev_reward = 0.0
         self.verbose = verbose
-        self.sinPoints = []
+
+        # Track behavior lines:
+        self.t1 = []
+        self.t2 = []
+        self.middleline = []
+        self.t3 = []
+        self.t4 = []
+
         self.fd_tile = fixtureDef(
             shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
         )
@@ -210,6 +219,7 @@ class CarRacing(gym.Env, EzPickle):
         dest_i = 0
         laps = 0
         track = []
+        track2 = []
         no_freeze = 2500
         visited_other_side = False
         while True:
@@ -260,6 +270,7 @@ class CarRacing(gym.Env, EzPickle):
             x += p1x * TRACK_DETAIL_STEP
             y += p1y * TRACK_DETAIL_STEP
             track.append((alpha, prev_beta * 0.5 + beta * 0.5, x, y))
+            track2.append((alpha, prev_beta * 0.5 + beta * 0.5, x, y))
             if laps > 4:
                 break
             no_freeze -= 1
@@ -288,7 +299,7 @@ class CarRacing(gym.Env, EzPickle):
 
         track = track[i1 : i2 - 1]
 
-        first_beta = track[0][1]
+        first_beta = track[0][1] 
         first_perp_x = math.cos(first_beta)
         first_perp_y = math.sin(first_beta)
         # Length of perpendicular jump to put together head and tail
@@ -335,6 +346,7 @@ class CarRacing(gym.Env, EzPickle):
                 x2 + TRACK_WIDTH * math.cos(beta2),
                 y2 + TRACK_WIDTH * math.sin(beta2),
             )
+
             vertices = [road1_l, road1_r, road2_r, road2_l]
             self.fd_tile.shape.vertices = vertices
             t = self.world.CreateStaticBody(fixtures=self.fd_tile)
@@ -367,21 +379,46 @@ class CarRacing(gym.Env, EzPickle):
                 self.road_poly.append(
                     ([b1_l, b1_r, b2_r, b2_l], (1, 1, 1) if i % 2 == 0 else (1, 0, 0))
                 )
-            # Draw a sinusoidal line along the middle line of the road
-            Amplitude = 1
-            Frequency = 0.05
-            sin_coeff = Amplitude * np.sin(Frequency * np.pi * i)
-            sin_point = (
-                x1 + sin_coeff * math.cos(beta1),
-                y1 + sin_coeff * math.sin(beta1),
-            )
-            self.sinPoints.append(sin_point)
-            body = self.world.CreateStaticBody()
-            body.color = [0, 0, 255]
-            
-
         self.track = track
+        
+        # Create additional lines for different driving behaviors
+        for i in range(len(track)+1):
+            alpha1, beta1, x1, y1 = track[i-1]
+            t1 = ( # Track line 1
+                x1 - (TRACK_WIDTH + 2) * math.cos(beta1),
+                y1 - (TRACK_WIDTH + 2) * math.sin(beta1),
+            )
+
+            t2 = ( # Track line 1
+                x1 - (TRACK_WIDTH - 2) * math.cos(beta1),
+                y1 - (TRACK_WIDTH - 2) * math.sin(beta1),
+            )
+
+            middleline = ( # Middle line 
+                x1 ,
+                y1 ,
+            )
+
+            t3 = ( # # Track line 2
+                x1 + (TRACK_WIDTH - 2)  * math.cos(beta1),
+                y1 + (TRACK_WIDTH - 2)  * math.sin(beta1),
+            )
+
+            t4 = ( # # Track line 2
+                x1 + (TRACK_WIDTH + 2)  * math.cos(beta1),
+                y1 + (TRACK_WIDTH + 2)  * math.sin(beta1),
+            )
+            
+            self.t1.append(t1)
+            self.t2.append(t2)
+            self.middleline.append(middleline)
+            self.t3.append(t3)
+            self.t4.append(t4)
+
         return True
+    
+    def return_carPosition(self):
+        return self.car.hull.position
 
     def reset(self):
         self._destroy()
@@ -433,6 +470,20 @@ class CarRacing(gym.Env, EzPickle):
                 step_reward = -100
 
         return self.state, step_reward, done, {}
+
+    
+    def draw_circle_as_point(self, x, y, radius, num_segments=30):
+        vertices = []
+        angle_increment = 2.0 * math.pi / num_segments
+
+        # Calculate the vertices of the circle
+        for i in range(num_segments):
+            angle = angle_increment * i
+            dx = x + radius * math.cos(angle)
+            dy = y + radius * math.sin(angle)
+            vertices += [dx, dy]
+
+        return vertices
 
     def render(self, mode="human"):
         assert mode in ["human", "state_pixels", "rgb_array"]
@@ -571,11 +622,37 @@ class CarRacing(gym.Env, EzPickle):
         vl.draw(gl.GL_QUADS)
         vl.delete()
 
-        for point in self.sinPoints:
-            #draw a blue point
-            colors.extend([0.0, 0.0, 1.0, 1.0] * 4)
-            
+        # Set line width and color
+        pyglet.gl.glLineWidth(3)
+        # Draw the lines
+        pyglet.gl.glColor3f(1, 1, 0) # yellow
+        pyglet.graphics.draw(len(self.t1), pyglet.gl.GL_LINE_STRIP,
+                            ( 'v2f', [v for point in self.t1 for v in point]) )
+        pyglet.gl.glColor3f(0, 1, 1) # cyan
+        pyglet.graphics.draw(len(self.t2), pyglet.gl.GL_LINE_STRIP,
+                            ('v2f', [v for point in self.t2 for v in point]))
+        pyglet.gl.glColor3f(1, 0, 1) # magenta
+        pyglet.graphics.draw(len(self.middleline), pyglet.gl.GL_LINE_STRIP,
+                            ('v2f', [v for point in self.middleline for v in point]))
+        pyglet.gl.glColor3f(0.5, 0.1, 0.5)  # purple
+        pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
+                            ('v2f', [v for point in self.t3 for v in point]))
+        pyglet.gl.glColor3f(0, 0, 1) # blue
+        pyglet.graphics.draw(len(self.t4), pyglet.gl.GL_LINE_STRIP,
+                            ('v2f', [v for point in self.t4 for v in point]))
+        
+        posx = self.car.hull.position.x
+        posy = self.car.hull.position.y
 
+        vertices = self.draw_circle_as_point(posx, posy, 5)
+        
+        pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
+                            ('v2f', vertices))
+
+        # Draw a circle
+        pyglet.gl.glColor3f(0, 1, 0) # red
+        pyglet.graphics.draw(1, GL_POINTS, ('v2f', (self.car.hull.position.x, self.car.hull.position.y)))
+            
 
     def render_indicators(self, W, H):
         s = W / 40.0
