@@ -34,6 +34,8 @@ import sys
 import math
 import numpy as np
 
+import cv2
+
 import Box2D
 from Box2D.b2 import fixtureDef
 from Box2D.b2 import polygonShape
@@ -141,12 +143,15 @@ class CarRacing(gym.Env, EzPickle):
         self.prev_reward = 0.0
         self.verbose = verbose
 
-        # Track behavior lines:
+        # Augmented rendering of state image. This is meant to generate track lines for different agents to follow.
+        # This is not used as an actual observation returned by step() which would end up in the training dataset.
         self.t1 = []
         self.t2 = []
-        self.middleline = []
         self.t3 = []
         self.t4 = []
+        self.t5 = []
+
+        self.augmImageRender = None # Augmented rendering of state image. This is meant to generate track lines for different agents to follow.
 
         self.fd_tile = fixtureDef(
             shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
@@ -394,7 +399,7 @@ class CarRacing(gym.Env, EzPickle):
                 y1 - (TRACK_WIDTH - 2) * math.sin(beta1),
             )
 
-            middleline = ( # Middle line 
+            t3 = ( # Middle line 
                 x1 ,
                 y1 ,
             )
@@ -411,7 +416,7 @@ class CarRacing(gym.Env, EzPickle):
             
             self.t1.append(t1)
             self.t2.append(t2)
-            self.middleline.append(middleline)
+            self.t3.append(t3)
             self.t3.append(t3)
             self.t4.append(t4)
 
@@ -441,6 +446,10 @@ class CarRacing(gym.Env, EzPickle):
 
         return self.step(None)[0]
 
+
+    def augmentedRender(self, mode="state_pixels"):
+        pass
+
     def step(self, action):
         if action is not None:
             self.car.steer(-action[0])
@@ -451,7 +460,7 @@ class CarRacing(gym.Env, EzPickle):
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
 
-        self.state = self.render("state_pixels")
+        self.state, self.augmImageRender = self.render("state_pixels")
 
         step_reward = 0
         done = False
@@ -469,7 +478,7 @@ class CarRacing(gym.Env, EzPickle):
                 done = True
                 step_reward = -100
 
-        return self.state, step_reward, done, {}
+        return self.state, step_reward, done, self.augmImageRender
 
     
     def draw_circle_as_point(self, x, y, radius, num_segments=30):
@@ -547,7 +556,7 @@ class CarRacing(gym.Env, EzPickle):
             VP_H = int(pixel_scale * WINDOW_H)
 
         gl.glViewport(0, 0, VP_W, VP_H)
-        t.enable()
+        t.enable()  # sets projection
         self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
@@ -565,15 +574,32 @@ class CarRacing(gym.Env, EzPickle):
         arr = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
         arr = arr.reshape(VP_H, VP_W, 4)
         arr = arr[::-1, :, 0:3]
+        
+        # Augmented render (same shape as before)
+        t.enable()  # sets projection
+        self.render_road(with_add_tracklines=True)
+        for geom in self.viewer.onetime_geoms:
+            geom.render()
+        self.viewer.onetime_geoms = []
+        t.disable()
+        self.render_indicators(WINDOW_W, WINDOW_H)
+        image_data = (
+            pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
+        )
+        arr_augm = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
+        arr_augm = arr_augm.reshape(VP_H, VP_W, 4)
+        arr_augm = arr_augm[::-1, :, 0:3]
 
-        return arr
+        return arr, arr_augm
 
     def close(self):
         if self.viewer is not None:
             self.viewer.close()
             self.viewer = None
 
-    def render_road(self):
+
+    
+    def render_road(self, with_add_tracklines=False):
         colors = [0.4, 0.8, 0.4, 1.0] * 4
         polygons_ = [
             +PLAYFIELD,
@@ -622,36 +648,38 @@ class CarRacing(gym.Env, EzPickle):
         vl.draw(gl.GL_QUADS)
         vl.delete()
 
-        # Set line width and color
-        pyglet.gl.glLineWidth(3)
-        # Draw the lines
-        pyglet.gl.glColor3f(1, 1, 0) # yellow
-        pyglet.graphics.draw(len(self.t1), pyglet.gl.GL_LINE_STRIP,
-                            ( 'v2f', [v for point in self.t1 for v in point]) )
-        pyglet.gl.glColor3f(0, 1, 1) # cyan
-        pyglet.graphics.draw(len(self.t2), pyglet.gl.GL_LINE_STRIP,
-                            ('v2f', [v for point in self.t2 for v in point]))
-        pyglet.gl.glColor3f(1, 0, 1) # magenta
-        pyglet.graphics.draw(len(self.middleline), pyglet.gl.GL_LINE_STRIP,
-                            ('v2f', [v for point in self.middleline for v in point]))
-        pyglet.gl.glColor3f(0.5, 0.1, 0.5)  # purple
-        pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
-                            ('v2f', [v for point in self.t3 for v in point]))
-        pyglet.gl.glColor3f(0, 0, 1) # blue
-        pyglet.graphics.draw(len(self.t4), pyglet.gl.GL_LINE_STRIP,
-                            ('v2f', [v for point in self.t4 for v in point]))
-        
-        posx = self.car.hull.position.x
-        posy = self.car.hull.position.y
+        if with_add_tracklines:
+            # Draw the track lines
+            # Set line width and color
+            pyglet.gl.glLineWidth(3)
+            # Draw the lines
+            pyglet.gl.glColor3f(1, 1, 0) # yellow
+            pyglet.graphics.draw(len(self.t1), pyglet.gl.GL_LINE_STRIP,
+                                ( 'v2f', [v for point in self.t1 for v in point]) )
+            pyglet.gl.glColor3f(0, 1, 1) # cyan
+            pyglet.graphics.draw(len(self.t2), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t2 for v in point]))
+            pyglet.gl.glColor3f(1, 0, 1) # magenta
+            pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t3 for v in point]))
+            pyglet.gl.glColor3f(0.5, 0.1, 0.5)  # purple
+            pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t3 for v in point]))
+            pyglet.gl.glColor3f(0, 0, 1) # blue
+            pyglet.graphics.draw(len(self.t4), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t4 for v in point]))
+            
+            posx = self.car.hull.position.x
+            posy = self.car.hull.position.y
 
-        vertices = self.draw_circle_as_point(posx, posy, 5)
-        
-        pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
-                            ('v2f', vertices))
+            vertices = self.draw_circle_as_point(posx, posy, 5)
+            
+            pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
+                                ('v2f', vertices))
 
-        # Draw a circle
-        pyglet.gl.glColor3f(0, 1, 0) # red
-        pyglet.graphics.draw(1, GL_POINTS, ('v2f', (self.car.hull.position.x, self.car.hull.position.y)))
+            # Draw a circle
+            pyglet.gl.glColor3f(0, 1, 0) # red
+            pyglet.graphics.draw(1, GL_POINTS, ('v2f', (self.car.hull.position.x, self.car.hull.position.y)))
             
 
     def render_indicators(self, W, H):
@@ -765,7 +793,11 @@ if __name__ == "__main__":
         restart = False
         while True:
             env.return_track_flag()
-            s, r, done, info = env.step(a)
+            s, r, done, augmRender = env.step(a)
+
+            cv2.imshow('augmRender', augmRender.astype(np.uint8))
+            cv2.waitKey(1)
+
             total_reward += r
             if steps % 200 == 0 or done:
                 print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
