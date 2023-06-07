@@ -173,21 +173,24 @@ class CarRacing(gym.Env, EzPickle):
     def return_absolute_velocity(self):
         return np.linalg.norm(self.car.hull.linearVelocity)
     
-    def return_track_flag(self):
-        """
-        Verify if a tire is on grass tile
-        Returns: True if on track, False if on grass
-        """
-        grass = True
-        track = False
-        for w in self.car.wheels:
-            for tile in w.tiles:
-                #If there is a tile that is not grass, then the car is not on grass
-                grass = False  
-                track = True
-        # print("GRASS: ", grass)
-        # print("TRACK: ", track)  
-        return track
+    # def return_track_flag(self): #Shitty code, somewhat works
+    #     """
+    #     Verify if a tire is on grass tile
+    #     Returns: True if on track, False if on grass
+    #     """
+    #     grass = True
+    #     track = False
+    #     for w in self.car.wheels:
+    #         for tile in w.tiles:
+    #             #If there is a tile that is not grass, then the car is not on grass
+    #             grass = False  
+    #             track = True
+    #     # print("GRASS: ", grass)
+    #     # print("TRACK: ", track)  
+    #     return track
+
+    def return_velocity_vector(self):
+        return self.car.hull.linearVelocity
     
 
     def _destroy(self):
@@ -478,8 +481,13 @@ class CarRacing(gym.Env, EzPickle):
                 done = True
                 step_reward = -100
 
-        return self.state, step_reward, done, self.augmImageRender
+        info = {'augmented_img': self.augmImageRender,
+                'car_position_vector': self.return_carPosition(),
+                'car_velocity_vector': self.car.hull.linearVelocity,
+            }
 
+
+        return self.state, step_reward, done, info
     
     def draw_circle_as_point(self, x, y, radius, num_segments=30):
         vertices = []
@@ -560,7 +568,7 @@ class CarRacing(gym.Env, EzPickle):
         self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
-        #self.viewer.onetime_geoms = []
+        self.viewer.onetime_geoms = []
         t.disable()
         self.render_indicators(WINDOW_W, WINDOW_H)
 

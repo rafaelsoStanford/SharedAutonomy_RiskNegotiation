@@ -205,6 +205,8 @@ def action_sinusoidalTrajectory(t, freq, observation, Amplitude, target_velocity
     # Calculate the angle to the target point
     error = targetPoint - carPos
     carVector = np.array([-1, 0])
+    
+
     angle = np.arccos(np.dot(error, carVector) / (np.linalg.norm(error) * np.linalg.norm(carVector)))
     #Check if the angle is positive or negative -> negative full left turn, positive full right turn        
     if error[1] > 0:

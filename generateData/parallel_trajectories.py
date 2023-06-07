@@ -13,15 +13,17 @@ import os
 import shutil
 import zarr
 import numpy as np
+import gym
+import math
 
 import time
+from simple_pid import PID
 
 from utils.replay_buffer import ReplayBuffer
 from utils.car_racing import CarRacing
 from utils.functions import *
 
 def maskTrajecories(image):
-
     # Define the threshold ranges for each mask
     lower_yellow = np.array([100, 100, 0], dtype=np.uint8)
     upper_yellow = np.array([255, 255, 0], dtype=np.uint8)
@@ -45,7 +47,14 @@ def maskTrajecories(image):
     mask_magenta = cv2.inRange(image, lower_magenta, upper_magenta)
     mask_purple = cv2.inRange(image, lower_purple, upper_purple)
 
-    return mask_yellow, mask_blue, mask_cyan, mask_magenta, mask_purple
+
+    dict_masks = {'lleft': mask_yellow, 
+                  'left': mask_cyan, 
+                  'middle': mask_magenta, 
+                  'right': mask_purple, 
+                  'rright': mask_blue}
+
+    return dict_masks
 def keyboardControl():
 
     # This is the code from the car_racing.py file
@@ -102,31 +111,84 @@ def keyboardControl():
                 break
     env.close()
 
-def run(env):
+
+def findClosestPoint(trajectory_img, carPos = np.array([70, 48])):
+    trajectory_idx = np.nonzero(trajectory_img)
+    #Find single closest edge point
+    distanceCarToTraj = np.linalg.norm(np.array(carPos)[:, None] - np.array(trajectory_idx), axis=0)
+    closetPointIdx = np.argmin(distanceCarToTraj)
+    closestPoint = np.array([trajectory_idx[0][closetPointIdx], trajectory_idx[1][closetPointIdx]])
+    return closestPoint
+
+def run(env, agent: int):
     # Simply run a trajectory for a bit to get the environment started
     env.reset()
     isopen = True
+    target_velocity = 30
+    action = np.array([0, 0, 0])
+    obs, reward, done, info = env.step(action)
     while isopen:
-        action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
-        image = obs.copy()
+        
 
+
+        
+        augmImg = info['augmented_img']
+        velB2vec = info['car_velocity_vector']
+        posB2vec = info['car_position_vector']
+
+
+
+        x = posB2vec.x
+        y = posB2vec.y
+        v = np.linalg.norm(velB2vec)
         # Render all trajectories using masks:
-        mask_yellow, mask_blue, mask_cyan, mask_magenta, mask_purple = maskTrajecories(image)
+        dict_masks = maskTrajecories(augmImg)
+        
+        pid_velocity = PID(0.1, 0.01, 0.05, setpoint=target_velocity)
+        pid_steering = PID(1, 0.01 , -0.1, setpoint=0)
+        # Construct action vector
+        out = augmImg.copy()
+        car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
+        car_dir_vector = [-1, 0]
 
-        # Display the masks:
-        # cv2.imshow("yellow", mask_yellow)
-        # cv2.imshow("blue", mask_blue)
-        # cv2.imshow("cyan", mask_cyan)
-        # cv2.imshow("magenta", mask_magenta)
-        # cv2.imshow("purple", mask_purple)
+        # Lane far left
+        track_img = dict_masks[agent]
+        # Get single line strip in front of car
+        line_strip = track_img[60, :]
+        idx = np.nonzero(line_strip)
+        if len(idx[0]) == 0:
+            obs, reward, done, info = env.step(action)
+            continue
 
-        posB2vec = env.return_carPosition()
-        # print("x position: ", posB2vec.x)
-        # print("y position: ", posB2vec.y)
+        # Get index closest to middle of strip (idx = 48)
+        idx = idx[0][np.argmin(np.abs(idx[0] - 48))]
+        car2point_vector = np.array([60, idx]) - car_pos_vector
 
-        pixelpos = (int(posB2vec.x), int(posB2vec.y))
-        print("pixel position: ", pixelpos)
+        # # Draw line strip on original image
+        # cv2.line(out, (0, 60), (96 , 60), (255, 0, 0), 1)
+        # # Draw point on line strip
+        # cv2.circle(out, (idx, 60), 2, (0, 0, 255), 2)
+        # # Draw vector from car to point
+        # cv2.arrowedLine(out, (48, 70), (48 + car2point_vector[1], 70 + car2point_vector[0]), (0, 255, 0), 1)
+
+        # As an approximation let angle be the x component of the car2point vector
+        err = car2point_vector[1]
+        action[0] = pid_steering(-err)
+        
+        if pid_velocity(v) < 0:
+            action[1] = 0
+            action[2] = pid_velocity(v)
+        else:
+            action[1] = pid_velocity(v)
+            action[2] = 0
+        #print(action)
+        obs, reward, done, info = env.step(action)
+
+
+        cv2.imshow('AugmImage', out)
+        cv2.imshow('image', obs)
+        cv2.waitKey(1)            
+
         isopen = env.render()
 
 
@@ -134,7 +196,7 @@ def generateData():
     # Init environment and buffer
     env = CarRacing()
     env.render(mode="human")
-    run(env) # Run the environment for a bit to get it started
+    run(env, 'lleft') 
 
 
 
