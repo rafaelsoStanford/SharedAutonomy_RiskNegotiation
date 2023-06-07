@@ -38,7 +38,6 @@ def maskTrajecories(image):
     lower_purple = np.array([100, 0 , 100], dtype=np.uint8)
     upper_purple = np.array([200, 50,200], dtype=np.uint8)
 
-
     # Apply the masks
     mask_yellow = cv2.inRange(image, lower_yellow, upper_yellow)
     mask_blue = cv2.inRange(image, lower_blue, upper_blue)
@@ -122,31 +121,25 @@ def run(env):
         # cv2.imshow("magenta", mask_magenta)
         # cv2.imshow("purple", mask_purple)
 
-
         posB2vec = env.return_carPosition()
         # print("x position: ", posB2vec.x)
         # print("y position: ", posB2vec.y)
 
         pixelpos = (int(posB2vec.x), int(posB2vec.y))
         print("pixel position: ", pixelpos)
-
-
-        
-
         isopen = env.render()
-
 
 
 def generateData():
     # Init environment and buffer
     env = CarRacing()
     env.render(mode="human")
-
     run(env) # Run the environment for a bit to get it started
 
 
 
 if __name__ == "__main__":
+
     ''' USAGE: 
         adjust method_id to select the method of data generation
 
