@@ -404,12 +404,12 @@ class CarRacing(gym.Env, EzPickle):
                 y1 ,
             )
 
-            t3 = ( # # Track line 2
+            t4 = ( # # Track line 2
                 x1 + (TRACK_WIDTH - 2)  * math.cos(beta1),
                 y1 + (TRACK_WIDTH - 2)  * math.sin(beta1),
             )
 
-            t4 = ( # # Track line 2
+            t5 = ( # # Track line 2
                 x1 + (TRACK_WIDTH + 2)  * math.cos(beta1),
                 y1 + (TRACK_WIDTH + 2)  * math.sin(beta1),
             )
@@ -417,8 +417,8 @@ class CarRacing(gym.Env, EzPickle):
             self.t1.append(t1)
             self.t2.append(t2)
             self.t3.append(t3)
-            self.t3.append(t3)
             self.t4.append(t4)
+            self.t5.append(t5)
 
         return True
     
@@ -560,7 +560,7 @@ class CarRacing(gym.Env, EzPickle):
         self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
-        self.viewer.onetime_geoms = []
+        #self.viewer.onetime_geoms = []
         t.disable()
         self.render_indicators(WINDOW_W, WINDOW_H)
 
@@ -663,19 +663,19 @@ class CarRacing(gym.Env, EzPickle):
             pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
                                 ('v2f', [v for point in self.t3 for v in point]))
             pyglet.gl.glColor3f(0.5, 0.1, 0.5)  # purple
-            pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
-                                ('v2f', [v for point in self.t3 for v in point]))
-            pyglet.gl.glColor3f(0, 0, 1) # blue
             pyglet.graphics.draw(len(self.t4), pyglet.gl.GL_LINE_STRIP,
                                 ('v2f', [v for point in self.t4 for v in point]))
+            pyglet.gl.glColor3f(0, 0, 1) # blue
+            pyglet.graphics.draw(len(self.t5), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t5 for v in point]))
             
             posx = self.car.hull.position.x
             posy = self.car.hull.position.y
 
             vertices = self.draw_circle_as_point(posx, posy, 5)
             
-            pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
-                                ('v2f', vertices))
+            #pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
+            #                    ('v2f', vertices))
 
             # Draw a circle
             pyglet.gl.glColor3f(0, 1, 0) # red
@@ -795,6 +795,7 @@ if __name__ == "__main__":
             env.return_track_flag()
             s, r, done, augmRender = env.step(a)
 
+            cv2.imshow('s', s)
             cv2.imshow('augmRender', augmRender.astype(np.uint8))
             cv2.waitKey(1)
 
