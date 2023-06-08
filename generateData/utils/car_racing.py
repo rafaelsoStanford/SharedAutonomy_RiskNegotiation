@@ -34,6 +34,8 @@ import sys
 import math
 import numpy as np
 
+import cv2
+
 import Box2D
 from Box2D.b2 import fixtureDef
 from Box2D.b2 import polygonShape
@@ -45,6 +47,7 @@ from gym.envs.box2d.car_dynamics import Car
 from gym.utils import seeding, EzPickle
 
 import pyglet
+from pyglet.gl import *
 
 pyglet.options["debug_gl"] = False
 from pyglet import gl
@@ -64,6 +67,7 @@ FRICTION_LIMIT = (
 
 SCALE = 6.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
+TRACK_RAD2 = 600 / SCALE  # Second track parallel to first track
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
 ZOOM = 2.7  # Camera zoom
@@ -138,7 +142,17 @@ class CarRacing(gym.Env, EzPickle):
         self.reward = 0.0
         self.prev_reward = 0.0
         self.verbose = verbose
-        self.sinPoints = []
+
+        # Augmented rendering of state image. This is meant to generate track lines for different agents to follow.
+        # This is not used as an actual observation returned by step() which would end up in the training dataset.
+        self.t1 = []
+        self.t2 = []
+        self.t3 = []
+        self.t4 = []
+        self.t5 = []
+
+        self.augmImageRender = None # Augmented rendering of state image. This is meant to generate track lines for different agents to follow.
+
         self.fd_tile = fixtureDef(
             shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
         )
@@ -159,21 +173,24 @@ class CarRacing(gym.Env, EzPickle):
     def return_absolute_velocity(self):
         return np.linalg.norm(self.car.hull.linearVelocity)
     
-    def return_track_flag(self):
-        """
-        Verify if a tire is on grass tile
-        Returns: True if on track, False if on grass
-        """
-        grass = True
-        track = False
-        for w in self.car.wheels:
-            for tile in w.tiles:
-                #If there is a tile that is not grass, then the car is not on grass
-                grass = False  
-                track = True
-        # print("GRASS: ", grass)
-        # print("TRACK: ", track)  
-        return track
+    # def return_track_flag(self): #Shitty code, somewhat works
+    #     """
+    #     Verify if a tire is on grass tile
+    #     Returns: True if on track, False if on grass
+    #     """
+    #     grass = True
+    #     track = False
+    #     for w in self.car.wheels:
+    #         for tile in w.tiles:
+    #             #If there is a tile that is not grass, then the car is not on grass
+    #             grass = False  
+    #             track = True
+    #     # print("GRASS: ", grass)
+    #     # print("TRACK: ", track)  
+    #     return track
+
+    def return_velocity_vector(self):
+        return self.car.hull.linearVelocity
     
 
     def _destroy(self):
@@ -210,6 +227,7 @@ class CarRacing(gym.Env, EzPickle):
         dest_i = 0
         laps = 0
         track = []
+        track2 = []
         no_freeze = 2500
         visited_other_side = False
         while True:
@@ -260,6 +278,7 @@ class CarRacing(gym.Env, EzPickle):
             x += p1x * TRACK_DETAIL_STEP
             y += p1y * TRACK_DETAIL_STEP
             track.append((alpha, prev_beta * 0.5 + beta * 0.5, x, y))
+            track2.append((alpha, prev_beta * 0.5 + beta * 0.5, x, y))
             if laps > 4:
                 break
             no_freeze -= 1
@@ -288,7 +307,7 @@ class CarRacing(gym.Env, EzPickle):
 
         track = track[i1 : i2 - 1]
 
-        first_beta = track[0][1]
+        first_beta = track[0][1] 
         first_perp_x = math.cos(first_beta)
         first_perp_y = math.sin(first_beta)
         # Length of perpendicular jump to put together head and tail
@@ -335,6 +354,7 @@ class CarRacing(gym.Env, EzPickle):
                 x2 + TRACK_WIDTH * math.cos(beta2),
                 y2 + TRACK_WIDTH * math.sin(beta2),
             )
+
             vertices = [road1_l, road1_r, road2_r, road2_l]
             self.fd_tile.shape.vertices = vertices
             t = self.world.CreateStaticBody(fixtures=self.fd_tile)
@@ -367,21 +387,46 @@ class CarRacing(gym.Env, EzPickle):
                 self.road_poly.append(
                     ([b1_l, b1_r, b2_r, b2_l], (1, 1, 1) if i % 2 == 0 else (1, 0, 0))
                 )
-            # Draw a sinusoidal line along the middle line of the road
-            Amplitude = 1
-            Frequency = 0.05
-            sin_coeff = Amplitude * np.sin(Frequency * np.pi * i)
-            sin_point = (
-                x1 + sin_coeff * math.cos(beta1),
-                y1 + sin_coeff * math.sin(beta1),
-            )
-            self.sinPoints.append(sin_point)
-            body = self.world.CreateStaticBody()
-            body.color = [0, 0, 255]
-            
-
         self.track = track
+        
+        # Create additional lines for different driving behaviors
+        for i in range(len(track)+1):
+            alpha1, beta1, x1, y1 = track[i-1]
+            t1 = ( # Track line 1
+                x1 - (TRACK_WIDTH + 2) * math.cos(beta1),
+                y1 - (TRACK_WIDTH + 2) * math.sin(beta1),
+            )
+
+            t2 = ( # Track line 1
+                x1 - (TRACK_WIDTH - 2) * math.cos(beta1),
+                y1 - (TRACK_WIDTH - 2) * math.sin(beta1),
+            )
+
+            t3 = ( # Middle line 
+                x1 ,
+                y1 ,
+            )
+
+            t4 = ( # # Track line 2
+                x1 + (TRACK_WIDTH - 2)  * math.cos(beta1),
+                y1 + (TRACK_WIDTH - 2)  * math.sin(beta1),
+            )
+
+            t5 = ( # # Track line 2
+                x1 + (TRACK_WIDTH + 2)  * math.cos(beta1),
+                y1 + (TRACK_WIDTH + 2)  * math.sin(beta1),
+            )
+            
+            self.t1.append(t1)
+            self.t2.append(t2)
+            self.t3.append(t3)
+            self.t4.append(t4)
+            self.t5.append(t5)
+
         return True
+    
+    def return_carPosition(self):
+        return self.car.hull.position
 
     def reset(self):
         self._destroy()
@@ -404,6 +449,10 @@ class CarRacing(gym.Env, EzPickle):
 
         return self.step(None)[0]
 
+
+    def augmentedRender(self, mode="state_pixels"):
+        pass
+
     def step(self, action):
         if action is not None:
             self.car.steer(-action[0])
@@ -414,7 +463,7 @@ class CarRacing(gym.Env, EzPickle):
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
 
-        self.state = self.render("state_pixels")
+        self.state, self.augmImageRender = self.render("state_pixels")
 
         step_reward = 0
         done = False
@@ -432,7 +481,26 @@ class CarRacing(gym.Env, EzPickle):
                 done = True
                 step_reward = -100
 
-        return self.state, step_reward, done, {}
+        info = {'augmented_img': self.augmImageRender,
+                'car_position_vector': self.return_carPosition(),
+                'car_velocity_vector': self.car.hull.linearVelocity,
+            }
+
+
+        return self.state, step_reward, done, info
+    
+    def draw_circle_as_point(self, x, y, radius, num_segments=30):
+        vertices = []
+        angle_increment = 2.0 * math.pi / num_segments
+
+        # Calculate the vertices of the circle
+        for i in range(num_segments):
+            angle = angle_increment * i
+            dx = x + radius * math.cos(angle)
+            dy = y + radius * math.sin(angle)
+            vertices += [dx, dy]
+
+        return vertices
 
     def render(self, mode="human"):
         assert mode in ["human", "state_pixels", "rgb_array"]
@@ -496,7 +564,7 @@ class CarRacing(gym.Env, EzPickle):
             VP_H = int(pixel_scale * WINDOW_H)
 
         gl.glViewport(0, 0, VP_W, VP_H)
-        t.enable()
+        t.enable()  # sets projection
         self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
@@ -514,15 +582,32 @@ class CarRacing(gym.Env, EzPickle):
         arr = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
         arr = arr.reshape(VP_H, VP_W, 4)
         arr = arr[::-1, :, 0:3]
+        
+        # Augmented render (same shape as before)
+        t.enable()  # sets projection
+        self.render_road(with_add_tracklines=True)
+        for geom in self.viewer.onetime_geoms:
+            geom.render()
+        self.viewer.onetime_geoms = []
+        t.disable()
+        self.render_indicators(WINDOW_W, WINDOW_H)
+        image_data = (
+            pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
+        )
+        arr_augm = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
+        arr_augm = arr_augm.reshape(VP_H, VP_W, 4)
+        arr_augm = arr_augm[::-1, :, 0:3]
 
-        return arr
+        return arr, arr_augm
 
     def close(self):
         if self.viewer is not None:
             self.viewer.close()
             self.viewer = None
 
-    def render_road(self):
+
+    
+    def render_road(self, with_add_tracklines=False):
         colors = [0.4, 0.8, 0.4, 1.0] * 4
         polygons_ = [
             +PLAYFIELD,
@@ -571,11 +656,39 @@ class CarRacing(gym.Env, EzPickle):
         vl.draw(gl.GL_QUADS)
         vl.delete()
 
-        for point in self.sinPoints:
-            #draw a blue point
-            colors.extend([0.0, 0.0, 1.0, 1.0] * 4)
+        if with_add_tracklines:
+            # Draw the track lines
+            # Set line width and color
+            pyglet.gl.glLineWidth(3)
+            # Draw the lines
+            pyglet.gl.glColor3f(1, 1, 0) # yellow
+            pyglet.graphics.draw(len(self.t1), pyglet.gl.GL_LINE_STRIP,
+                                ( 'v2f', [v for point in self.t1 for v in point]) )
+            pyglet.gl.glColor3f(0, 1, 1) # cyan
+            pyglet.graphics.draw(len(self.t2), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t2 for v in point]))
+            pyglet.gl.glColor3f(1, 0, 1) # magenta
+            pyglet.graphics.draw(len(self.t3), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t3 for v in point]))
+            pyglet.gl.glColor3f(0.5, 0.1, 0.5)  # purple
+            pyglet.graphics.draw(len(self.t4), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t4 for v in point]))
+            pyglet.gl.glColor3f(0, 0, 1) # blue
+            pyglet.graphics.draw(len(self.t5), pyglet.gl.GL_LINE_STRIP,
+                                ('v2f', [v for point in self.t5 for v in point]))
             
+            posx = self.car.hull.position.x
+            posy = self.car.hull.position.y
 
+            vertices = self.draw_circle_as_point(posx, posy, 5)
+            
+            #pyglet.graphics.draw(len(vertices) // 2, GL_TRIANGLE_FAN,
+            #                    ('v2f', vertices))
+
+            # Draw a circle
+            pyglet.gl.glColor3f(0, 1, 0) # red
+            pyglet.graphics.draw(1, GL_POINTS, ('v2f', (self.car.hull.position.x, self.car.hull.position.y)))
+            
 
     def render_indicators(self, W, H):
         s = W / 40.0
@@ -688,7 +801,12 @@ if __name__ == "__main__":
         restart = False
         while True:
             env.return_track_flag()
-            s, r, done, info = env.step(a)
+            s, r, done, augmRender = env.step(a)
+
+            cv2.imshow('s', s)
+            cv2.imshow('augmRender', augmRender.astype(np.uint8))
+            cv2.waitKey(1)
+
             total_reward += r
             if steps % 200 == 0 or done:
                 print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
