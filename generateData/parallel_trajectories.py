@@ -56,7 +56,6 @@ def maskTrajecories(image):
 
     return dict_masks
 def keyboardControl():
-
     # This is the code from the car_racing.py file
     from pyglet.window import key
     a = np.array([0.0, 0.0, 0.0])
