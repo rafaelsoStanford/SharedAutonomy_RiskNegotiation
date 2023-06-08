@@ -47,7 +47,7 @@ def maskTrajecories(image):
     mask_magenta = cv2.inRange(image, lower_magenta, upper_magenta)
     mask_purple = cv2.inRange(image, lower_purple, upper_purple)
 
-
+    # Label the differently colored trajectories
     dict_masks = {'lleft': mask_yellow, 
                   'left': mask_cyan, 
                   'middle': mask_magenta, 
@@ -126,7 +126,11 @@ def run(env, agent: int):
     isopen = True
     target_velocity = 40
     action = np.array([0, 0, 0])
-    obs, reward, done, info = env.step(action)
+    pid_velocity = PID(0.1, 0.01, 0, setpoint=target_velocity)
+    pid_steering = PID(1, 0.01 , -0.1, setpoint=0)
+    car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
+    obs, reward, done, info = env.step(action) # Take a step to get the environment started (action is empty)
+    
     while isopen:       
         augmImg = info['augmented_img']
         velB2vec = info['car_velocity_vector']
@@ -137,29 +141,22 @@ def run(env, agent: int):
         v = np.linalg.norm(velB2vec)
         # Render all trajectories using masks:
         dict_masks = maskTrajecories(augmImg)
-        
-        pid_velocity = PID(0.1, 0.01, 0, setpoint=target_velocity)
-        pid_steering = PID(1, 0.01 , -0.1, setpoint=0)
-        # Construct action vector
-        out = augmImg.copy()
-        car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
-
-        # Lane far left
-        track_img = dict_masks[agent]
+        track_img = dict_masks[agent] # Get the correct mask for the desired agent
         # Get single line strip in front of car
         line_strip = track_img[60, :]
         idx = np.nonzero(line_strip)
-        if len(idx[0]) == 0:
+
+        if len(idx[0]) == 0: # Rarely happens, but sometimes the is no intersection of trajectory with line strip -> continue with previous action
             obs, reward, done, info = env.step(action)
             continue
 
         # Get index closest to middle of strip (idx = 48)
         idx = idx[0][np.argmin(np.abs(idx[0] - 48))]
-        car2point_vector = np.array([60, idx]) - car_pos_vector
+        car2point_vector = np.array([60, idx]) - car_pos_vector # F
 
         # As an approximation let angle be the x component of the car2point vector
-        err = car2point_vector[1]
-        action[0] = pid_steering(-err)
+        err = -car2point_vector[1] # Correcting for the fact that negative value is a left turn, ie positive angle
+        action[0] = pid_steering(err)
         
         if pid_velocity(v) < 0:
             action[1] = 0
@@ -181,9 +178,7 @@ def generateData():
     # Init environment and buffer
     env = CarRacing()
     env.render(mode="human")
-    run(env, 'rright') 
-
-
+    run(env, 'rright')
 
 if __name__ == "__main__":
 
