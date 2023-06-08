@@ -124,19 +124,13 @@ def run(env, agent: int):
     # Simply run a trajectory for a bit to get the environment started
     env.reset()
     isopen = True
-    target_velocity = 30
+    target_velocity = 40
     action = np.array([0, 0, 0])
     obs, reward, done, info = env.step(action)
-    while isopen:
-        
-
-
-        
+    while isopen:       
         augmImg = info['augmented_img']
         velB2vec = info['car_velocity_vector']
         posB2vec = info['car_position_vector']
-
-
 
         x = posB2vec.x
         y = posB2vec.y
@@ -144,12 +138,11 @@ def run(env, agent: int):
         # Render all trajectories using masks:
         dict_masks = maskTrajecories(augmImg)
         
-        pid_velocity = PID(0.1, 0.01, 0.05, setpoint=target_velocity)
+        pid_velocity = PID(0.1, 0.01, 0, setpoint=target_velocity)
         pid_steering = PID(1, 0.01 , -0.1, setpoint=0)
         # Construct action vector
         out = augmImg.copy()
         car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
-        car_dir_vector = [-1, 0]
 
         # Lane far left
         track_img = dict_masks[agent]
@@ -164,13 +157,6 @@ def run(env, agent: int):
         idx = idx[0][np.argmin(np.abs(idx[0] - 48))]
         car2point_vector = np.array([60, idx]) - car_pos_vector
 
-        # # Draw line strip on original image
-        # cv2.line(out, (0, 60), (96 , 60), (255, 0, 0), 1)
-        # # Draw point on line strip
-        # cv2.circle(out, (idx, 60), 2, (0, 0, 255), 2)
-        # # Draw vector from car to point
-        # cv2.arrowedLine(out, (48, 70), (48 + car2point_vector[1], 70 + car2point_vector[0]), (0, 255, 0), 1)
-
         # As an approximation let angle be the x component of the car2point vector
         err = car2point_vector[1]
         action[0] = pid_steering(-err)
@@ -181,13 +167,12 @@ def run(env, agent: int):
         else:
             action[1] = pid_velocity(v)
             action[2] = 0
-        #print(action)
+
         obs, reward, done, info = env.step(action)
 
-
-        cv2.imshow('AugmImage', out)
-        cv2.imshow('image', obs)
-        cv2.waitKey(1)            
+        # cv2.imshow('AugmImage', out)
+        # cv2.imshow('image', obs)
+        # cv2.waitKey(1)            
 
         isopen = env.render()
 
@@ -196,7 +181,7 @@ def generateData():
     # Init environment and buffer
     env = CarRacing()
     env.render(mode="human")
-    run(env, 'lleft') 
+    run(env, 'rright') 
 
 
 
