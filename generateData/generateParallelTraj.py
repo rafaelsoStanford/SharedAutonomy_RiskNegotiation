@@ -209,11 +209,11 @@ def driving(env, buffer , TARGET_VELOCITY = 10, NUM_EPISODES = 10, MODE = 'middl
 def generateData():
     # Parameters for all three data gathering methods
     TARGET_VELOCITY = 30
-    NUM_EPISODES = 3
+    NUM_EPISODES = 1
     CHUNK_LEN = -1
 
     #Path to save data
-    path = "./data/multipleDrivingBehaviours_large.zarr"
+    path = "./data/multipleDrivingBehaviours.zarr"
     
     # Init environment and buffer
     env = CarRacing()
