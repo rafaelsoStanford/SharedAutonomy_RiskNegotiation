@@ -429,6 +429,13 @@ class CarRacing(gym.Env, EzPickle):
         return self.car.hull.position
 
     def reset(self):
+                    # Delete all points in lists
+        self.t1.clear()
+        self.t2.clear()
+        self.t3.clear()
+        self.t4.clear()
+        self.t5.clear()
+        
         self._destroy()
         self.reward = 0.0
         self.prev_reward = 0.0
@@ -568,7 +575,6 @@ class CarRacing(gym.Env, EzPickle):
         self.render_road()
         for geom in self.viewer.onetime_geoms:
             geom.render()
-        self.viewer.onetime_geoms = []
         t.disable()
         self.render_indicators(WINDOW_W, WINDOW_H)
 
@@ -582,7 +588,8 @@ class CarRacing(gym.Env, EzPickle):
         arr = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
         arr = arr.reshape(VP_H, VP_W, 4)
         arr = arr[::-1, :, 0:3]
-        
+
+    
         # Augmented render (same shape as before)
         t.enable()  # sets projection
         self.render_road(with_add_tracklines=True)
@@ -597,7 +604,6 @@ class CarRacing(gym.Env, EzPickle):
         arr_augm = np.fromstring(image_data.get_data(), dtype=np.uint8, sep="")
         arr_augm = arr_augm.reshape(VP_H, VP_W, 4)
         arr_augm = arr_augm[::-1, :, 0:3]
-
         return arr, arr_augm
 
     def close(self):
@@ -688,6 +694,9 @@ class CarRacing(gym.Env, EzPickle):
             # Draw a circle
             pyglet.gl.glColor3f(0, 1, 0) # red
             pyglet.graphics.draw(1, GL_POINTS, ('v2f', (self.car.hull.position.x, self.car.hull.position.y)))
+
+
+
             
 
     def render_indicators(self, W, H):
@@ -800,12 +809,9 @@ if __name__ == "__main__":
         steps = 0
         restart = False
         while True:
-            env.return_track_flag()
+
             s, r, done, augmRender = env.step(a)
 
-            cv2.imshow('s', s)
-            cv2.imshow('augmRender', augmRender.astype(np.uint8))
-            cv2.waitKey(1)
 
             total_reward += r
             if steps % 200 == 0 or done:
