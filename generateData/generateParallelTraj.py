@@ -92,15 +92,17 @@ def driving(env, buffer , TARGET_VELOCITY = 10, NUM_EPISODES = 10, MODE = 'middl
         env.reset()
         obs, reward, done, info = env.step(action) # Take a step to get the environment started (action is empty)
         absVel = []
-        max_steps = 1000
+        max_steps = 50
         for i in range(max_steps):
-            isopen = env.render("state_pixels")
+            isopen = env.render("human")
             augmImg = info['augmented_img']
             velB2vec = info['car_velocity_vector']
             posB2vec = info['car_position_vector']  
 
             carVelocity_wFrame = [velB2vec.x , velB2vec.y]
             carPosition_wFrame = [posB2vec.x , posB2vec.y]
+
+            #action = np.array([0, 0, 0], dtype=np.float32)
 
             if i % 200 == 0: # All 10 steps, we change velocity
                 velocitites = [10 ,20 ,30]
@@ -158,11 +160,15 @@ def driving(env, buffer , TARGET_VELOCITY = 10, NUM_EPISODES = 10, MODE = 'middl
             obs, reward, done, info = env.step(action)
             #print(action)
             # Save the observation and action            
+            
+            
             img_hist.append(obs)
             vel_hist.append(carVelocity_wFrame)
             pos_hist.append(carPosition_wFrame)
             act_hist.append(action)
-
+            
+            
+            #print(action)
             # print("Angle: ", angle)
             # print("Error: ", err)
             # print("Action: ", action[0])
@@ -189,6 +195,19 @@ def driving(env, buffer , TARGET_VELOCITY = 10, NUM_EPISODES = 10, MODE = 'middl
         vel_hist = np.array(vel_hist, dtype=np.float32)
         pos_hist = np.array(pos_hist, dtype=np.float32)
 
+        # Normalize each image in img_hist to be between 0 and 1
+        img_hist = img_hist / 255.0
+
+        # Check if act_hist has nan values. If yes, replace with 0
+        if np.isnan(act_hist).any():
+            act_hist = np.nan_to_num(act_hist)
+        
+        # Round all values in act, vel, pos hist to 2 decimals
+        act_hist = np.round(act_hist, 2)
+        vel_hist = np.round(vel_hist, 2)
+        pos_hist = np.round(pos_hist, 2)
+        
+
         episode_data = {"img": img_hist, 
                 "velocity": vel_hist, 
                 "position": pos_hist,
@@ -196,6 +215,15 @@ def driving(env, buffer , TARGET_VELOCITY = 10, NUM_EPISODES = 10, MODE = 'middl
                 "h_action": act_hist #This will act as a placeholder for "human action". It is crude, but works for current testing purposes
                 }
         buffer.add_episode(episode_data)
+
+        # print first element of episode data each array
+        print("First element of episode data:")
+        print("img: ", img_hist[0])
+        print("vel: ", vel_hist[0])
+        print("pos: ", pos_hist[0])
+        print("act: ", act_hist[0])
+        print("h_act: ", act_hist[0])
+
 
         # # Plot the absolute velocity history
         # plt.plot(absVel)
@@ -213,7 +241,7 @@ def generateData():
     CHUNK_LEN = -1
 
     #Path to save data
-    path = "./data/multipleDrivingBehaviours.zarr"
+    path = "./data/multipleDrivingBehaviours_testing.zarr"
     
     # Init environment and buffer
     env = CarRacing()
