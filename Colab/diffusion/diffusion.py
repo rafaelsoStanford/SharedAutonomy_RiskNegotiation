@@ -2,16 +2,17 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 
-from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.callbacks import LearningRateMonitor, StochasticWeightAveraging, ModelCheckpoint
-
 from Unet import *
 from denoisingNet import *
 
 from diffusers import DDPMScheduler
 from diffusers.training_utils import EMAModel
 from diffusers.optimization import get_scheduler
+
+
+from PIL import Image
+import io
+import numpy as np
 
 class Diffusion(pl.LightningModule):
     def __init__(self, noise_steps=100
@@ -118,13 +119,13 @@ class Diffusion(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         loss = self.onepass(batch, batch_idx, mode="Train")
-        self.log("Loss/Train_loss",loss)
+        self.log("train_loss",loss)
         self.log('lr', self.optimizers().param_groups[0]['lr'])
         return loss
     
     def validation_step(self, batch, batch_idx):
         loss = self.onepass(batch, batch_idx, mode="Val")
-        self.log("Loss/Val_loss",loss)
+        self.log("val_loss",loss)
 
     def predict_step(self, batch, batch_idx):
         nimage_obs = batch['image'][:,:self.T_obs]
@@ -183,7 +184,7 @@ class Diffusion(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "Loss/Val_loss",
+                "monitor": "train_loss",
                 "frequency": 1
             },
         }
@@ -214,26 +215,16 @@ class Diffusion(pl.LightningModule):
         self.ema_net = ema_net.load_state_dict(self.model_fromFile)
         print('Pretrained weights loaded.')
 
+    def plt2tsb(figure, writer, fig_name, niter):
+        # Save the plot to a BytesIO object
+        buf = io.BytesIO()
+        figure.savefig(buf, format='png')
+        buf.seek(0)
 
+        # Open the image and convert to RGB, then to Tensor
+        image = Image.open(buf).convert('RGB')
+        image_tensor = torch.tensor(np.array(image)).permute(2, 0, 1)
 
-
-
-        # ### Define model which will be a simplifed 1D UNet
-        # self.vision_encoder = VisionEncoder() # Loads pretrained weights of Resnet18 with output dim 512
-        # self.vision_encoder.device = self.device
-        
-        # self.noise_predictor = ConditionalUnet1D(
-        #                             input_dim= self.diffusion_out_dim,
-        #                             global_cond_dim= self.global_cond_dim * self.T_obs)
-        
-        # self.nets = nn.ModuleDict({
-        #     'vision_encoder': self.vision_encoder,
-        #     'noise_predictor': self.noise_predictor
-        # })
-
-        # self.ema_nets = self.nets
-
-    def sample(self):
-        with torch.no_grad:
-            pass
+        # Add the image to TensorBoard
+        writer.add_image(fig_name, image_tensor, niter)
 

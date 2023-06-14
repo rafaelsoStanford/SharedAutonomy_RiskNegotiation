@@ -29,13 +29,13 @@ def main(n_epochs=100, AMP=True, batch_size=16):
     action_dim = 3 + 2 + 2
     
     # # ===========model===========
-    dataset = LoadCarRacingData(data_dir="./data/multipleDrivingBehaviours_testing.zarr", batch_size=1,
+    dataset = LoadCarRacingData(data_dir="./data/multipleDrivingBehaviours_testing.zarr.zip", batch_size=1,
                                 T_obs=T_obs, T_pred=T_pred , T_act =T_act)
     dataset.setup()
     dataloader = dataset.train_dataloader()
     
     diffusion = Diffusion(T_obs=T_obs, T_pred=T_pred , T_action =T_act, global_cond_dim=obs_dim ,diffusion_out_dim= action_dim)
-    diffusion.load_checkpoint("Colab/diffusion/Checkpoint_Parallel.pt")
+    diffusion.load_checkpoint("model_parallel.ckpt")
     diffusion.eval()
 
 
