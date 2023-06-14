@@ -1,27 +1,21 @@
-import os
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import pytorch_lightning as pl
 
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import LearningRateMonitor, StochasticWeightAveraging, ModelCheckpoint
 
-import zarr
 import numpy as np
 
 from diffusion import *
 from LoadCarRacingData import * 
 
 
-def main(n_epochs=100, AMP=True, batch_size=16):
+def main(n_epochs=1000, AMP=True, batch_size=16):
 
     # Parameters:
-    T_obs= 2
-    T_pred=8
+    T_obs= 8
+    T_pred= 8
     T_act =1
 
     # Dimensions:
@@ -36,10 +30,11 @@ def main(n_epochs=100, AMP=True, batch_size=16):
 
     # ===========data===========
     # Load Dataset using Pytorch Lightning DataModule
-    dataset = LoadCarRacingData(data_dir="./data/multipleDrivingBehaviours_parallel.zarr.zip", batch_size=batch_size,
+    dataset = CarRacingDataModule(data_dir="./data" , batch_size=batch_size,
                                 T_obs=T_obs, T_pred=T_pred , T_act =T_act)
-    dataset.setup()
-    dataloader = dataset.train_dataloader()
+    dataset.setup(name='multipleDrivingBehaviours_parallel_train.zarr.zip')
+    train_dataloader = dataset.train_dataloader()
+    valid_dataloader = dataset.val_dataloader()
     
     # # ===========model===========
     diffusion = Diffusion(T_obs=T_obs, T_pred=T_pred , T_action =T_act, global_cond_dim=obs_dim ,diffusion_out_dim= action_dim)
@@ -53,13 +48,13 @@ def main(n_epochs=100, AMP=True, batch_size=16):
                                           save_on_train_epoch_end=True,
                                           verbose=True)
     # train model
-    trainer = pl.Trainer(accelerator='gpu', devices=1, precision=("16-mixed" if AMP else 32), max_epochs=n_epochs, 
+    trainer = pl.Trainer(accelerator='gpu', devices=[0,1], precision=("16-mixed" if AMP else 32), max_epochs=n_epochs, 
                          callbacks=[early_stop_callback, checkpoint_callback],
                          logger=tensorboard, profiler="simple", val_check_interval=0.25, 
                          accumulate_grad_batches=1, gradient_clip_val=0.5)
     
-    trainer.validate(model= diffusion, dataloaders=dataloader)
-    trainer.fit(model=diffusion, train_dataloaders=dataloader)
+    trainer.validate(model= diffusion, dataloaders=valid_dataloader)
+    trainer.fit(model=diffusion, train_dataloaders=train_dataloader, val_dataloaders=valid_dataloader)
 
 if __name__ == "__main__":
     main()
