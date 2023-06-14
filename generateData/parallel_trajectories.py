@@ -47,7 +47,7 @@ def maskTrajecories(image):
     mask_magenta = cv2.inRange(image, lower_magenta, upper_magenta)
     mask_purple = cv2.inRange(image, lower_purple, upper_purple)
 
-
+    # Label the differently colored trajectories
     dict_masks = {'lleft': mask_yellow, 
                   'left': mask_cyan, 
                   'middle': mask_magenta, 
@@ -55,8 +55,8 @@ def maskTrajecories(image):
                   'rright': mask_blue}
 
     return dict_masks
-def keyboardControl():
 
+def keyboardControl():
     # This is the code from the car_racing.py file
     from pyglet.window import key
     a = np.array([0.0, 0.0, 0.0])
@@ -124,43 +124,66 @@ def run(env, agent: int):
     # Simply run a trajectory for a bit to get the environment started
     env.reset()
     isopen = True
-    target_velocity = 40
-    action = np.array([0, 0, 0])
-    obs, reward, done, info = env.step(action)
+    target_velocity = 40      
+    action = np.array([0, 0, 0], dtype=np.float32)
+    pid_velocity = PID(1.0, 0.05 , 0.2, setpoint=target_velocity, output_limits=(-1, 1))
+    pid_steering = PID(0.5, 0.01, 0.05, setpoint=0)
+    #pid_steering = PID(0.9, 0.06, 0.4 , setpoint=0,  differential_on_measurement=False, proportional_on_measurement=False)
+    pid_steering.output_limits = (-1, 1)
+    car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
+    obs, reward, done, info = env.step(action) # Take a step to get the environment started (action is empty)
+    
     while isopen:       
+        isopen = env.render()
         augmImg = info['augmented_img']
         velB2vec = info['car_velocity_vector']
         posB2vec = info['car_position_vector']
 
-        x = posB2vec.x
-        y = posB2vec.y
+        out = augmImg.copy()
+        
         v = np.linalg.norm(velB2vec)
         # Render all trajectories using masks:
         dict_masks = maskTrajecories(augmImg)
-        
-        pid_velocity = PID(0.1, 0.01, 0, setpoint=target_velocity)
-        pid_steering = PID(1, 0.01 , -0.1, setpoint=0)
-        # Construct action vector
-        out = augmImg.copy()
-        car_pos_vector = np.array([70, 48]) # Car remains fixed relativ to window 
-
-        # Lane far left
-        track_img = dict_masks[agent]
+        track_img = dict_masks[agent] # Get the correct mask for the desired agent
         # Get single line strip in front of car
         line_strip = track_img[60, :]
-        idx = np.nonzero(line_strip)
-        if len(idx[0]) == 0:
+        idx = np.nonzero(line_strip)[0]
+
+        if len(idx) == 0: # Rarely happens, but sometimes the is no intersection of trajectory with line strip -> continue with previous action
             obs, reward, done, info = env.step(action)
-            continue
+            continue 
 
         # Get index closest to middle of strip (idx = 48)
-        idx = idx[0][np.argmin(np.abs(idx[0] - 48))]
-        car2point_vector = np.array([60, idx]) - car_pos_vector
+        idx = idx[np.argmin(np.abs(idx - 48))]
+        target_point = np.array([60, idx])
+        car2point_vector = target_point - car_pos_vector
+        
+
+        # Draw line from car to target point
+        # Draw target point
+        # Draw mask
+
+        cv2.circle(out, (target_point[1], target_point[0]), 2, (255, 0, 0), -1)
+        cv2.line(out, (car_pos_vector[1], car_pos_vector[0]), (car_pos_vector[1] + car2point_vector[1], car_pos_vector[0] + car2point_vector[0]), (0, 0, 255), 2)
+        cv2.imshow('Trajectory', track_img)
+        cv2.imshow('AugmImage', out)
+        cv2.imshow('image', obs)
+        cv2.waitKey(0)  
 
         # As an approximation let angle be the x component of the car2point vector
-        err = car2point_vector[1]
-        action[0] = pid_steering(-err)
-        
+        err =  idx - 48 #-car2point_vector[1] # Correcting for the fact that negative value is a left turn, ie positive angle
+        err = np.clip(err, -5, 5)
+
+        angle = np.arctan2(abs(err), abs(car2point_vector[0]))
+        if err > 0:
+            angle = -angle
+        print("PID Steering:", pid_steering(angle))
+        action[0] = pid_steering(angle)
+
+        print("Angle: ", angle)
+        print("Error: ", err)
+        print("Action: ", action[0])
+        print("Speed: ", v)
         if pid_velocity(v) < 0:
             action[1] = 0
             action[2] = pid_velocity(v)
@@ -170,20 +193,14 @@ def run(env, agent: int):
 
         obs, reward, done, info = env.step(action)
 
-        # cv2.imshow('AugmImage', out)
-        # cv2.imshow('image', obs)
-        # cv2.waitKey(1)            
 
-        isopen = env.render()
 
 
 def generateData():
     # Init environment and buffer
     env = CarRacing()
     env.render(mode="human")
-    run(env, 'rright') 
-
-
+    run(env, 'left')
 
 if __name__ == "__main__":
 
