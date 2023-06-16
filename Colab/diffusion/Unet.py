@@ -108,8 +108,10 @@ class ConditionalUnet1D(nn.Module):
         input_dim,
         global_cond_dim, # Full conditioning flattend vector with a certina gloabl_conditioning_dim
         diffusion_step_embed_dim=256, # Embedding dim for diffusion time step (usually we called this t)
-        down_dims=[256,512,1024],
-        kernel_size=5,
+        #down_dims=[256,512,1024],
+        down_dims=[64,128,256,512],
+        kernel_size = 3,
+        #kernel_size=5,
         n_groups=8
         ):
         """

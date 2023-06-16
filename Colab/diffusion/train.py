@@ -14,8 +14,8 @@ from LoadCarRacingData import *
 def main(n_epochs=1000, AMP=True, batch_size=16):
 
     # Parameters:
-    T_obs= 8
-    T_pred= 8
+    T_obs= 16
+    T_pred= 32
     T_act =1
 
     # Dimensions:
@@ -32,7 +32,7 @@ def main(n_epochs=1000, AMP=True, batch_size=16):
     # Load Dataset using Pytorch Lightning DataModule
     dataset = CarRacingDataModule(data_dir="./data" , batch_size=batch_size,
                                 T_obs=T_obs, T_pred=T_pred , T_act =T_act)
-    dataset.setup(name='multipleDrivingBehaviours_parallel_train.zarr.zip')
+    dataset.setup(name='multipleDrivingBehaviours_testing_5eps.zarr.zip')
     train_dataloader = dataset.train_dataloader()
     valid_dataloader = dataset.val_dataloader()
     

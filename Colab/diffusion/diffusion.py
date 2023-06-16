@@ -185,8 +185,8 @@ class Diffusion(pl.LightningModule):
 
 
             plt.plot(position_observed[0,:, 0], position_observed[0,:,1],'b.')
-            plt.scatter(position_estimated[0,:,0],position_estimated[0,:,1],s=10, alpha=alphas, c='r') 
             plt.plot(position_gt[0,:,0],position_gt[0,:,1],'g.')
+            plt.scatter(position_estimated[0,:,0],position_estimated[0,:,1],s=10, alpha=alphas, c='r') 
 
             plt.grid()
             plt.axis('equal')

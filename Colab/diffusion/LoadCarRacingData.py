@@ -168,7 +168,7 @@ class CarRacingDataset(torch.utils.data.Dataset):
         # get nomralized data using these indices
         nsample = sample_sequence(
             train_data=self.normalized_train_data,
-            sequence_length=self.obs_horizon + self.pred_horizon,
+            sequence_length=self.pred_horizon,
             buffer_start_idx=buffer_start_idx,
             buffer_end_idx=buffer_end_idx,
             sample_start_idx=sample_start_idx,
