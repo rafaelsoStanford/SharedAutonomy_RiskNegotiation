@@ -1,9 +1,3 @@
-#@markdown ### **Vision Encoder**
-#@markdown
-#@markdown Defines helper functions:
-#@markdown - `get_resnet` to initialize standard ResNet vision encoder
-#@markdown - `replace_bn_with_gn` to replace all BatchNorm layers with GroupNorm
-
 import torch
 import torch.nn as nn
 import torchvision

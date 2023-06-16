@@ -5,17 +5,15 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import LearningRateMonitor, StochasticWeightAveraging, ModelCheckpoint
 
-import numpy as np
 
-from diffusion import *
+from Diffusion import *
 from LoadCarRacingData import * 
 
-
-def main(n_epochs=1000, AMP=True, batch_size=16):
+def main(n_epochs=100, AMP=True, batch_size=32):
 
     # Parameters:
-    T_obs= 8
-    T_pred= 8
+    T_obs= 16
+    T_pred= 32
     T_act =1
 
     # Dimensions:
@@ -32,7 +30,7 @@ def main(n_epochs=1000, AMP=True, batch_size=16):
     # Load Dataset using Pytorch Lightning DataModule
     dataset = CarRacingDataModule(data_dir="./data" , batch_size=batch_size,
                                 T_obs=T_obs, T_pred=T_pred , T_act =T_act)
-    dataset.setup(name='multipleDrivingBehaviours_parallel_train.zarr.zip')
+    dataset.setup(name='multipleDrivingBehaviours_5Eps_parallel.zarr.zip')
     train_dataloader = dataset.train_dataloader()
     valid_dataloader = dataset.val_dataloader()
     
@@ -41,7 +39,7 @@ def main(n_epochs=1000, AMP=True, batch_size=16):
     # -----PL configs-----
     tensorboard = pl_loggers.TensorBoardLogger(save_dir="tb_logs/",name='',flush_secs=1)
 
-    early_stop_callback = EarlyStopping(monitor='lr', stopping_threshold=2e-6, patience=n_epochs)   
+    early_stop_callback = EarlyStopping(monitor='lr', stopping_threshold=1e-7, patience=n_epochs)   
     checkpoint_callback = ModelCheckpoint(filename="{epoch}",     # Checkpoint filename format
                                           save_top_k=-1,          # Save all checkpoints
                                           every_n_epochs=5,               # Save every epoch

@@ -168,7 +168,7 @@ class CarRacingDataset(torch.utils.data.Dataset):
         # get nomralized data using these indices
         nsample = sample_sequence(
             train_data=self.normalized_train_data,
-            sequence_length=self.obs_horizon + self.pred_horizon,
+            sequence_length=self.pred_horizon,
             buffer_start_idx=buffer_start_idx,
             buffer_end_idx=buffer_end_idx,
             sample_start_idx=sample_start_idx,
@@ -176,22 +176,20 @@ class CarRacingDataset(torch.utils.data.Dataset):
         )
 
         # discard unused observations and add corresponding observations to each prediction batch
-
         
-
         nsample['image'] = nsample['image'][:self.obs_horizon ,:]
         nsample['action_obs'] = nsample['actions_pred'][:self.obs_horizon,:]
         nsample['velocity_obs'] = nsample['velocities_pred'][:self.obs_horizon,:]
         nsample['position_obs'] = nsample['positions_pred'][:self.obs_horizon,:]
 
-        # Modify the prediction to be relative to the last observation
-        # position_pred = nsample['positions_pred'][self.obs_horizon:, :]
-        # velocity_pred = nsample['velocities_pred'][self.obs_horizon:, :]
-        # action_pred = nsample['actions_pred'][self.pred_horizon:, :]
+        # # Modify the prediction to be relative to the last observation
+        # # position_pred = nsample['positions_pred'][self.obs_horizon:, :]
+        # # velocity_pred = nsample['velocities_pred'][self.obs_horizon:, :]
+        # # action_pred = nsample['actions_pred'][self.pred_horizon:, :]
         
-        nsample.update( {'positions_pred': nsample['positions_pred'][self.obs_horizon:, :]} )
-        nsample.update( {'velocities_pred': nsample['velocities_pred'][self.obs_horizon:, :]} ) 
-        nsample.update( {'actions_pred': nsample['actions_pred'][self.obs_horizon:, :]} )  
+        # nsample.update( {'positions_pred': nsample['positions_pred'][self.obs_horizon:, :]} )
+        # nsample.update( {'velocities_pred': nsample['velocities_pred'][self.obs_horizon:, :]} ) 
+        # nsample.update( {'actions_pred': nsample['actions_pred'][self.obs_horizon:, :]} )  
 
 
         
@@ -221,7 +219,7 @@ class CarRacingDataModule(pl.LightningDataModule):
         self.data_train, self.data_val = random_split(self.data_full, [int(len(self.data_full)*0.8), len(self.data_full) - int(len(self.data_full)*0.8)])
 
     def train_dataloader(self):
-        return DataLoader(self.data_train, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        return DataLoader(self.data_train, batch_size=self.batch_size, shuffle=True, num_workers=2)
 
     def val_dataloader(self):
-        return DataLoader(self.data_val, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(self.data_val, batch_size=self.batch_size, shuffle=False, num_workers=2)

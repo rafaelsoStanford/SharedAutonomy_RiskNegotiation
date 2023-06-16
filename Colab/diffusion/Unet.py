@@ -4,7 +4,6 @@ import math
 from typing import Tuple, Sequence, Dict, Union, Callable
 import torchvision
 
-
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -54,6 +53,8 @@ class Conv1dBlock(nn.Module):
         return self.block(x)
     
 
+
+
 class ConditionalResidualBlock1D(nn.Module):
     def __init__(self, 
             in_channels, 
@@ -82,7 +83,7 @@ class ConditionalResidualBlock1D(nn.Module):
         self.residual_conv = nn.Conv1d(in_channels, out_channels, 1) \
             if in_channels != out_channels else nn.Identity()
 
-    def forward(self, x, cond):
+    def forward(self, x: torch.tensor, cond):
         '''
             x : [ batch_size x in_channels x horizon ]
             cond : [ batch_size x cond_dim]
@@ -102,6 +103,7 @@ class ConditionalResidualBlock1D(nn.Module):
         out = self.blocks[1](out)
         out = out + self.residual_conv(x)
         return out
+
     
 class ConditionalUnet1D(nn.Module):
     def __init__(self, 
@@ -109,7 +111,9 @@ class ConditionalUnet1D(nn.Module):
         global_cond_dim, # Full conditioning flattend vector with a certina gloabl_conditioning_dim
         diffusion_step_embed_dim=256, # Embedding dim for diffusion time step (usually we called this t)
         down_dims=[256,512,1024],
-        kernel_size=5,
+        #down_dims=[128,256,512],
+        kernel_size=3,
+        #kernel_size=5,
         n_groups=8
         ):
         """
@@ -130,7 +134,7 @@ class ConditionalUnet1D(nn.Module):
 
         dsed = diffusion_step_embed_dim
 
-        diffusion_step_encoder = nn.Sequential( # Embedding for diffusion step and apply an acitvation function Final channel size is dsed, which is the oriinal size
+        diffusion_step_encoder = nn.Sequential( # Embedding for diffusion step and apply an acitvation function Final channel size is dsed, which is the original size
             SinusoidalPosEmb(dsed),
             nn.Linear(dsed, dsed * 4),
             nn.Mish(),
@@ -204,7 +208,7 @@ class ConditionalUnet1D(nn.Module):
         """
         # (B,T,C)
         sample = sample.moveaxis(-1,-2)
-        # (B,C,T)
+        # (B,C,T) We treat state dimension as channel dimension for 1D conv
 
         # 1. time
         timesteps = timestep
